@@ -14,7 +14,8 @@ def dump_jsonl(data, output_path, append=False):
             f.write(json_record + "\n")
 
 
-dataset = load_dataset("c4", "en", split="validation", streaming=True)
+# Use allenai/c4 which is the updated version
+dataset = load_dataset("allenai/c4", "en", split="validation", streaming=True, trust_remote_code=True)
 dataset = dataset.shuffle(buffer_size=10000, seed=42)
 path = "c4_valid.jsonl"
 
