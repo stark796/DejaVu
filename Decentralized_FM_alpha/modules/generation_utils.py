@@ -11,34 +11,73 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 import torch
 from torch import nn
 
-from transformers.generation_beam_constraints import Constraint, DisjunctiveConstraint, PhrasalConstraint
-from transformers.generation_beam_search import BeamScorer, BeamSearchScorer, ConstrainedBeamSearchScorer
-from transformers.generation_logits_process import (
-    EncoderNoRepeatNGramLogitsProcessor,
-    ExponentialDecayLengthPenalty,
-    ForcedBOSTokenLogitsProcessor,
-    ForcedEOSTokenLogitsProcessor,
-    HammingDiversityLogitsProcessor,
-    InfNanRemoveLogitsProcessor,
-    LogitNormalization,
-    LogitsProcessorList,
-    MinLengthLogitsProcessor,
-    NoBadWordsLogitsProcessor,
-    NoRepeatNGramLogitsProcessor,
-    PrefixConstrainedLogitsProcessor,
-    RepetitionPenaltyLogitsProcessor,
-    TemperatureLogitsWarper,
-    TopKLogitsWarper,
-    TopPLogitsWarper,
-    TypicalLogitsWarper,
-)
-from transformers.generation_stopping_criteria import (
-    MaxLengthCriteria,
-    MaxTimeCriteria,
-    StoppingCriteria,
-    StoppingCriteriaList,
-    validate_stopping_criteria,
-)
+try:
+    from transformers.generation.beam_constraints import Constraint, DisjunctiveConstraint, PhrasalConstraint
+except ImportError:
+    from transformers.generation_beam_constraints import Constraint, DisjunctiveConstraint, PhrasalConstraint
+
+try:
+    from transformers.generation.beam_search import BeamScorer, BeamSearchScorer, ConstrainedBeamSearchScorer
+except ImportError:
+    from transformers.generation_beam_search import BeamScorer, BeamSearchScorer, ConstrainedBeamSearchScorer
+
+try:
+    from transformers.generation.logits_process import (
+        EncoderNoRepeatNGramLogitsProcessor,
+        ExponentialDecayLengthPenalty,
+        ForcedBOSTokenLogitsProcessor,
+        ForcedEOSTokenLogitsProcessor,
+        HammingDiversityLogitsProcessor,
+        InfNanRemoveLogitsProcessor,
+        LogitNormalization,
+        LogitsProcessorList,
+        MinLengthLogitsProcessor,
+        NoBadWordsLogitsProcessor,
+        NoRepeatNGramLogitsProcessor,
+        PrefixConstrainedLogitsProcessor,
+        RepetitionPenaltyLogitsProcessor,
+        TemperatureLogitsWarper,
+        TopKLogitsWarper,
+        TopPLogitsWarper,
+        TypicalLogitsWarper,
+    )
+except ImportError:
+    from transformers.generation_logits_process import (
+        EncoderNoRepeatNGramLogitsProcessor,
+        ExponentialDecayLengthPenalty,
+        ForcedBOSTokenLogitsProcessor,
+        ForcedEOSTokenLogitsProcessor,
+        HammingDiversityLogitsProcessor,
+        InfNanRemoveLogitsProcessor,
+        LogitNormalization,
+        LogitsProcessorList,
+        MinLengthLogitsProcessor,
+        NoBadWordsLogitsProcessor,
+        NoRepeatNGramLogitsProcessor,
+        PrefixConstrainedLogitsProcessor,
+        RepetitionPenaltyLogitsProcessor,
+        TemperatureLogitsWarper,
+        TopKLogitsWarper,
+        TopPLogitsWarper,
+        TypicalLogitsWarper,
+    )
+
+try:
+    from transformers.generation.stopping_criteria import (
+        MaxLengthCriteria,
+        MaxTimeCriteria,
+        StoppingCriteria,
+        StoppingCriteriaList,
+        validate_stopping_criteria,
+    )
+except ImportError:
+    from transformers.generation_stopping_criteria import (
+        MaxLengthCriteria,
+        MaxTimeCriteria,
+        StoppingCriteria,
+        StoppingCriteriaList,
+        validate_stopping_criteria,
+    )
 
 
 
