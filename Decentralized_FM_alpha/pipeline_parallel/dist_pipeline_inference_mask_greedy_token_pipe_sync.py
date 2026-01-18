@@ -729,8 +729,9 @@ class DistGreedyInferenceMaskTokenPipeSync(DistGreedyInferenceTokePipeSync):
                 self._check_stop(step)
 
             print("Compute generate token step <", step, ">.")
-            # for last node, the first step does not compute
-            if step != 0 or self.pp_rank != self.pipeline_group_size - 1:
+            # for last node in multi-GPU, the first step does not compute (receives from first node)
+            # but for single GPU, we always need to process mask
+            if self.pipeline_group_size == 1 or step != 0 or self.pp_rank != self.pipeline_group_size - 1:
                 attention_mask = self._process_mask_during_generation(attention_mask)
             self.forward_new_token_pipeline_step(step, attention_mask=attention_mask)
 
@@ -764,11 +765,9 @@ class DistGreedyInferenceMaskTokenPipeSync(DistGreedyInferenceTokePipeSync):
             attention_mask, self.token_micro_batch_size, dim=0
         )
         for i in range(self.token_micro_batch_num):
-            # Single GPU case: no send/recv needed
+            # Single GPU case: no send/recv needed, always compute
             if self.pipeline_group_size == 1:
-                if step != self.generate_seq_length - 1 and (
-                    self.stop is None or self.stop_flag.item() == 0
-                ):
+                if self.stop is None or self.stop_flag.item() == 0:
                     self.profile_mark_forward_token_comp_start(i)
                     self._forward_compute_generate_token(i, mask=attention_masks[i])
                     self.profile_mark_forward_token_comp_end(i)
