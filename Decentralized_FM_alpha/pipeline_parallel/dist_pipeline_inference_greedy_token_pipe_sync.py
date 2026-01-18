@@ -501,7 +501,11 @@ class DistGreedyInferenceTokePipeSync:
     def profile_token_pipeline_step(self, step: int):
         torch.cuda.synchronize()
         for i in range(self.token_micro_batch_num):
-            if self.pp_rank == self.pipeline_group_size - 1:
+            # Single GPU: only log compute, no send/recv
+            if self.pipeline_group_size == 1:
+                comp_log = self._profile_token_pipeline_step_add_comp_slot(step, i)
+                self.profiling_log.append(comp_log)
+            elif self.pp_rank == self.pipeline_group_size - 1:
                 if step == 0:
                     # Send
                     send_log = self._profile_token_pipeline_step_add_send_slot(step, i)
