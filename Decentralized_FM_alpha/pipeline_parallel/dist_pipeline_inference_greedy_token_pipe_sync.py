@@ -530,6 +530,8 @@ class DistGreedyInferenceTokePipeSync:
                     self.profiling_log.append(send_log)
 
     def export_profiling_result(self, filename):
+        import os
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
         with open(filename, 'w') as outfile:
             json.dump(self.profiling_log, outfile)
 
