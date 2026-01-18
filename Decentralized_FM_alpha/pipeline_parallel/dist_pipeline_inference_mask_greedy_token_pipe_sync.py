@@ -402,12 +402,12 @@ class DistGreedyInferenceMaskTokenPipeSync(DistGreedyInferenceTokePipeSync):
         self.share_prefix.clear()
 
     def _merge_cached_seqs_and_attentions(self):
-        if not self.echo_prompt:
-            self.i_current_token = 0
-        else:
-            self.i_current_token = self.input_seq_length
-
         if self._is_merged:
+            if not self.echo_prompt:
+                self.i_current_token = 0
+            else:
+                self.i_current_token = self.input_seq_length
+                
             if self.pp_rank == self.pipeline_group_size - 1:
                 for i in range(self.seq_num):
                     self._copy_initial_token_emb(i)
@@ -431,6 +431,12 @@ class DistGreedyInferenceMaskTokenPipeSync(DistGreedyInferenceTokePipeSync):
         else:
             super()._merge_cached_seqs_and_attentions()
             self._is_merged = True
+            # Reset i_current_token AFTER super call, since super's merge 
+            # may call _generate_new_token which increments it
+            if not self.echo_prompt:
+                self.i_current_token = 0
+            else:
+                self.i_current_token = self.input_seq_length
 
         if self.stop is not None:
             self.stop_flag[:] = 0
