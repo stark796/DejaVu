@@ -17,7 +17,7 @@ echo "start running ${file}"
 # world-size: 1 (single GPU)
 # pipeline-group-size: 1
 
-ARGS="--model-name facebook/opt-125m \
+ARGS="--model-name ./pretrained_models/opt-125m \
 --model-type opt \
 --seed 42 \
 --fp16 \
@@ -29,7 +29,6 @@ ARGS="--model-name facebook/opt-125m \
 --token-micro-batch-size 1 \
 --world-size 1 --pipeline-group-size 1 --data-group-size 1 \
 --pp-mode pipe_sync_sample_mask_token_pipe \
---checkpoint ./pretrained_models/opt-125m \
 --infer-data ${file} \
 --output-path ${output_file}"
 
