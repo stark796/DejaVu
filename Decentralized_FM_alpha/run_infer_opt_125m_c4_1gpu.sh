@@ -7,7 +7,7 @@ mkdir -p ./c4_val
 
 # Create a dummy c4_valid.jsonl if it doesn't exist for initial testing
 if [ ! -f "$file" ]; then
-    echo '{"text": "This is a test sentence for perplexity calculation."}' > "$file"
+    echo '{"text": "This is a test sentence for perplexity calculation.", "max_tokens": 16}' > "$file"
 fi
     
 echo "start running ${file}"
