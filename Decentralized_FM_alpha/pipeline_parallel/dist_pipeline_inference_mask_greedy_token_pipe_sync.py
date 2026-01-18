@@ -663,7 +663,14 @@ class DistGreedyInferenceMaskTokenPipeSync(DistGreedyInferenceTokePipeSync):
             attention_mask = [None] * self.seq_num
 
         for i in range(self.seq_num):
-            if self.pp_rank == 0:  # Only send output to next node, do not receive
+            if self.pipeline_group_size == 1:
+                # Single GPU: just compute, no send/recv needed
+                self.profile_mark_forward_seq_comp_start(i)
+                self._forward_compute_prompt_seq(
+                    index=i, seq=input_seqs[i], mask=attention_mask[i]
+                )
+                self.profile_mark_forward_seq_comp_end(i)
+            elif self.pp_rank == 0:  # Only send output to next node, do not receive
                 # Compute
                 self.profile_mark_forward_seq_comp_start(i)
                 self._forward_compute_prompt_seq(
@@ -748,16 +755,25 @@ class DistGreedyInferenceMaskTokenPipeSync(DistGreedyInferenceTokePipeSync):
                     if not is_stopped:
                         self.stop_flag[:] = 0
                         break
-            # sync
-            self.comm.broadcast(self.stop_flag, src=self.pipeline_group_size - 1)
+            # sync (skip for single GPU)
+            if self.pipeline_group_size > 1:
+                self.comm.broadcast(self.stop_flag, src=self.pipeline_group_size - 1)
 
     def forward_new_token_pipeline_step(self, step: int, attention_mask=None):
         attention_masks = torch.split(
             attention_mask, self.token_micro_batch_size, dim=0
         )
         for i in range(self.token_micro_batch_num):
+            # Single GPU case: no send/recv needed
+            if self.pipeline_group_size == 1:
+                if step != self.generate_seq_length - 1 and (
+                    self.stop is None or self.stop_flag.item() == 0
+                ):
+                    self.profile_mark_forward_token_comp_start(i)
+                    self._forward_compute_generate_token(i, mask=attention_masks[i])
+                    self.profile_mark_forward_token_comp_end(i)
             # Last node:
-            if self.pp_rank == self.pipeline_group_size - 1:
+            elif self.pp_rank == self.pipeline_group_size - 1:
                 if step == 0:
                     # Send
                     self.profile_mark_forward_token_send_start(i)
