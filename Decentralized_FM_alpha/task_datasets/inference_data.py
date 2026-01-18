@@ -262,8 +262,10 @@ class RequestProcessor:
 
             max_input_seq_length = 1
             for i, x in enumerate(self.data):
+                # Handle both "prompt" and "text" keys for different dataset formats
+                prompt_text = x["request"].get("prompt") or x["request"].get("text", "")
                 seq_length = self.tokenizer(
-                    x["request"]["prompt"],
+                    prompt_text,
                     return_tensors="pt",
                     padding=True,
                     truncation=False,
@@ -340,8 +342,10 @@ class RequestProcessor:
         print("input seq length:", args.input_seq_length)
 
     def get_dataloader(self, batch_size, num_workers=0):
+        # Handle both "prompt" and "text" keys for different dataset formats
+        prompts = [x["request"].get("prompt") or x["request"].get("text", "") for x in self.data]
         dataset = JsonDataset(
-            [x["request"]["prompt"] for x in self.data],
+            prompts,
             self.tokenizer,
             batch_size=batch_size,
         )
