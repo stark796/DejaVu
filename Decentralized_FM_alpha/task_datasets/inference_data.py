@@ -491,7 +491,12 @@ def get_tokenizer(args):
 
         tokenizer = GPT2Tokenizer.from_pretrained("/home/ubuntu/fm/models/opt-66b-new")
     else:
-        tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        # Support local paths with local_files_only flag
+        import os
+        if os.path.isdir(args.model_name):
+            tokenizer = AutoTokenizer.from_pretrained(args.model_name, local_files_only=True)
+        else:
+            tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
