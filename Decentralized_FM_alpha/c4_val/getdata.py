@@ -20,6 +20,10 @@ dataset = dataset.shuffle(buffer_size=10000, seed=42)
 path = "c4_valid.jsonl"
 
 for idx, doc in enumerate(tqdm(dataset)):
+    # Truncate very long documents to avoid sequence length issues
+    # (max ~8000 chars to stay under 2048 tokens with typical tokenization)
+    text = doc["text"][:8000] if len(doc["text"]) > 8000 else doc["text"]
+    
     data = {
         "best_of": 1,
         "echo": True,
@@ -27,7 +31,7 @@ for idx, doc in enumerate(tqdm(dataset)):
         "max_tokens": 0,
         "model": "opt-175b",
         "n": 1,
-        "prompt": doc["text"],
+        "prompt": text,
         "request_type": "language-model-inference",
         "stop": None,
         "temperature": 0,
