@@ -25,20 +25,20 @@
 #   Data saved to: ./data/llama_3b_c4/
 # ==============================================================================
 
-# Paths
-file=./c4_train/c4_train.jsonl
-output_file=./c4_train/output_llama_3b_collect.jsonl
+# Paths - use c4_val data we already downloaded
+file=./c4_val/c4_valid.jsonl
+output_file=./c4_val/output_llama_3b_collect.jsonl
 model_path=./pretrained_models/llama-3.2-3b
 data_path=./data/llama_3b_c4
 
 # Create directories
-mkdir -p ./c4_train
 mkdir -p ${data_path}
 
-# Download C4 training data if not exists
+# Check if data exists
 if [ ! -f "$file" ]; then
-    echo "Downloading C4 training data..."
-    cd c4_train && python get_data.py && cd ..
+    echo "ERROR: C4 data not found at ${file}"
+    echo "Please run: python c4_val/getdata.py"
+    exit 1
 fi
 
 echo "======================================"
