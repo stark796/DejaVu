@@ -97,7 +97,7 @@ def get_data(args, layer_idx):
         label = np.array(np.memmap(
             path, dtype='float16', mode='r',
             shape=(config['N'], config['intermediate'])
-        )
+        ))
         
         return query, label
 
