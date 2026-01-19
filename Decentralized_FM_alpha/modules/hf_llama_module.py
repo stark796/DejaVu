@@ -388,6 +388,10 @@ class LlamaBlock(nn.Module):
             mask: Attention mask
             position_ids: Position IDs for RoPE
         """
+        # Debug: Check for NaN in input
+        if self.layer_idx == 0 and torch.isnan(x).any():
+            print(f"WARNING: NaN in input to layer {self.layer_idx}")
+        
         # Determine past length for attention mask
         if layer_past is not None:
             past_length = layer_past[0].size(2)
@@ -418,6 +422,11 @@ class LlamaBlock(nn.Module):
 
         # Pre-norm + Attention
         hidden_states = self.input_layernorm(hidden_states)
+        
+        # Debug: Check after layernorm
+        if self.layer_idx == 0 and torch.isnan(hidden_states).any():
+            print(f"WARNING: NaN after input_layernorm in layer {self.layer_idx}")
+        
         hidden_states, _, present = self.self_attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
@@ -425,12 +434,22 @@ class LlamaBlock(nn.Module):
             past_key_value=layer_past,
             use_cache=True,
         )
+        
+        # Debug: Check after attention
+        if self.layer_idx == 0 and torch.isnan(hidden_states).any():
+            print(f"WARNING: NaN after attention in layer {self.layer_idx}")
+        
         hidden_states = residual + hidden_states
 
         # Pre-norm + MLP
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
+        
+        # Debug: Check after MLP
+        if self.layer_idx == 0 and torch.isnan(hidden_states).any():
+            print(f"WARNING: NaN after MLP in layer {self.layer_idx}")
+        
         hidden_states = residual + hidden_states
 
         return hidden_states, present
