@@ -492,12 +492,10 @@ def get_tokenizer(args):
         tokenizer = GPT2Tokenizer.from_pretrained("/home/ubuntu/fm/models/opt-66b-new")
     else:
         # Support local paths with local_files_only flag
-        import os
-        # Convert to absolute path to handle both ./path and /absolute/path
-        model_path = os.path.abspath(args.model_name)
-        if os.path.isdir(model_path):
-            print(f"[DEBUG] Loading local model from {model_path} with local_files_only=True")
-            tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
+        # If path contains "/" or ".", it's likely a local file path, not a repo ID
+        if "/" in args.model_name or args.model_name.startswith("."):
+            print(f"[DEBUG] Loading local model from {args.model_name} with local_files_only=True")
+            tokenizer = AutoTokenizer.from_pretrained(args.model_name, local_files_only=True)
         else:
             print(f"[DEBUG] Loading model {args.model_name} from HuggingFace Hub")
             tokenizer = AutoTokenizer.from_pretrained(args.model_name)
