@@ -15,7 +15,7 @@ def dump_jsonl(data, output_path, append=False):
 
 
 # Exact replication of OPT data collection setup
-dataset = load_dataset("allenai/c4", "en", split="train", streaming=True, trust_remote_code=True)
+dataset = load_dataset("allenai/c4", "en", split="train", streaming=True)
 dataset = dataset.shuffle(buffer_size=10000, seed=42)
 path = "c4_valid.jsonl"
 
