@@ -88,10 +88,13 @@ try:
             if line.strip() == '':
                 continue
             item = json.loads(line)
-            if 'result' in item and item['result']:
-                for i, r in enumerate(item['result']):
-                    if 'token_logprob' in r and r['token_logprob'] is not None:
-                        logprobs.append(r['token_logprob'])
+            # Correct path: result.choices[].logprobs.token_logprobs
+            if 'result' in item and 'choices' in item['result']:
+                for choice in item['result']['choices']:
+                    if 'logprobs' in choice and 'token_logprobs' in choice['logprobs']:
+                        for lp in choice['logprobs']['token_logprobs']:
+                            if lp is not None and not np.isnan(lp):
+                                logprobs.append(lp)
     
     if logprobs:
         ppl = np.exp(-np.mean(logprobs))
