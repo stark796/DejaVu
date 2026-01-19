@@ -517,15 +517,16 @@ class DistGreedyInferenceMaskTokenPipeSync(DistGreedyInferenceTokePipeSync):
             1 : seq_len,
         ] = logprobs
         if self.top_k_per_token > 0:
-            logprobs, indices = z.topk(k=self.top_k_per_token, dim=-1)
+            topk_logprobs, topk_indices = z.topk(k=self.top_k_per_token, dim=-1)
+            # Slice to match target range (seq_len-1 elements for positions 1:seq_len)
             self.ret_topk_tokens[
                 index * self.micro_batch_size : (index + 1) * self.micro_batch_size,
                 1 : seq_len,
-            ] = indices
+            ] = topk_indices[:, :seq_len-1]
             self.ret_topk_token_logprobs[
                 index * self.micro_batch_size : (index + 1) * self.micro_batch_size,
                 1 : seq_len,
-            ] = logprobs
+            ] = topk_logprobs[:, :seq_len-1]
 
     def _copy_initial_token_emb(self, index):
         assert self.pp_rank == self.pipeline_group_size - 1
