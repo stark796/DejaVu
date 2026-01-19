@@ -272,6 +272,7 @@ class LlamaBlock(nn.Module):
             data_path = os.environ.get("DATA_PATH", "./data/llama_3b_c4")
         
         os.makedirs(data_path, exist_ok=True)
+        print(f"[Layer {layer_index}] Setting up data collection in {data_path}")
         
         # MLP query: input to MLP block (before RMSNorm)
         module.fp_mlp_query = np.memmap(
@@ -279,6 +280,8 @@ class LlamaBlock(nn.Module):
             dtype="float16", mode="w+",
             shape=(num_samples, config.hidden_size),
         )
+        # Initialize with zeros to avoid NaN from uninitialized memory
+        module.fp_mlp_query[:] = 0
         
         # Attention query: input to attention block (before RMSNorm)
         module.fp_att_query = np.memmap(
@@ -286,6 +289,7 @@ class LlamaBlock(nn.Module):
             dtype="float16", mode="w+",
             shape=(num_samples, config.hidden_size),
         )
+        module.fp_att_query[:] = 0
         
         # MLP label: activation pattern from gated MLP
         # Note: Llama uses gate_proj and up_proj, so intermediate_size is the label dimension
@@ -294,6 +298,7 @@ class LlamaBlock(nn.Module):
             dtype="float16", mode="w+",
             shape=(num_samples, config.intermediate_size),
         )
+        module.fp_label[:] = 0
         
         # Attention label: head importance scores
         module.self_attn.fp_i = 0
@@ -302,6 +307,7 @@ class LlamaBlock(nn.Module):
             dtype="float16", mode="w+",
             shape=(num_samples, config.num_attention_heads),
         )
+        module.self_attn.fp_label[:] = 0
 
         return module
 
@@ -387,6 +393,10 @@ class LlamaBlock(nn.Module):
             begin, end = self.fp_i, min(self.fp_i + num_tokens, self.fp_label.shape[0])
             self.fp_label[begin:end] = _label[:end-begin].detach().cpu().numpy()
             self.fp_i += num_tokens
+            
+            # Print progress occasionally
+            if self.layer_idx == 0 and self.fp_i % 10000 < num_tokens:
+                print(f"[Data Collection] Layer 0: {self.fp_i}/{self.fp_label.shape[0]} samples collected")
         
         hidden_states = self.mlp.down_proj(activation)
         hidden_states = residual + hidden_states
