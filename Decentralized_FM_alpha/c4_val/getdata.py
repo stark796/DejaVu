@@ -15,15 +15,14 @@ def dump_jsonl(data, output_path, append=False):
 
 
 # Exact replication of OPT data collection setup
+# Note: Documents > 2048 tokens get truncated by the tokenizer anyway (OPT's max_length=2048)
+# We pre-truncate text to ~7500 chars (~2000 tokens) to avoid off-by-one edge case in the pipeline
 dataset = load_dataset("allenai/c4", "en", split="train", streaming=True, trust_remote_code=True)
 dataset = dataset.shuffle(buffer_size=10000, seed=42)
 path = "c4_valid.jsonl"
 
 for idx, doc in enumerate(tqdm(dataset)):
-    # Truncate very long documents to avoid sequence length issues
-    # (max ~8000 chars to stay under 2048 tokens with typical tokenization)
-    text = doc["text"][:8000] if len(doc["text"]) > 8000 else doc["text"]
-    
+    text = doc["text"][:7500]  # ~2000 tokens, stays under 2048 limit like OPT
     data = {
         "best_of": 1,
         "echo": True,
