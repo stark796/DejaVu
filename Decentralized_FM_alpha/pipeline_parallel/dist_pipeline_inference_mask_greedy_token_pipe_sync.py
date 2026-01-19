@@ -505,23 +505,26 @@ class DistGreedyInferenceMaskTokenPipeSync(DistGreedyInferenceTokePipeSync):
         indices = indices[:, 1:]  # skip first
 
         logprobs = torch.gather(z, -1, indices.unsqueeze(-1)).squeeze(-1)
+        
+        # Use actual tensor size to avoid off-by-one errors
+        seq_len = original_indices.size(1)
         self.ret_tokens[
             index * self.micro_batch_size : (index + 1) * self.micro_batch_size,
-            : self.i_current_token,
+            : seq_len,
         ] = original_indices
         self.ret_token_logprobs[
             index * self.micro_batch_size : (index + 1) * self.micro_batch_size,
-            1 : self.i_current_token,
+            1 : seq_len,
         ] = logprobs
         if self.top_k_per_token > 0:
             logprobs, indices = z.topk(k=self.top_k_per_token, dim=-1)
             self.ret_topk_tokens[
                 index * self.micro_batch_size : (index + 1) * self.micro_batch_size,
-                1 : self.i_current_token,
+                1 : seq_len,
             ] = indices
             self.ret_topk_token_logprobs[
                 index * self.micro_batch_size : (index + 1) * self.micro_batch_size,
-                1 : self.i_current_token,
+                1 : seq_len,
             ] = logprobs
 
     def _copy_initial_token_emb(self, index):
