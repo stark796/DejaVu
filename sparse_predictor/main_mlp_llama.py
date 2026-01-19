@@ -31,7 +31,7 @@ from trainer_mlp import train
 # Data paths for Llama models
 DATA = {
     "llama-3b": {
-        "c4": "../data/llama_3b_c4",
+        "c4": "../Decentralized_FM_alpha/data/llama_3b_c4",
     },
 }
 
