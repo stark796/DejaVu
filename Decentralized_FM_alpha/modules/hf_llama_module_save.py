@@ -242,7 +242,7 @@ class LlamaBlock(nn.Module):
         self.fp_label = None
 
     @classmethod
-    def from_pretrained(cls, model_path, config=None, layer_index=None, data_path=None, num_samples=50000):
+    def from_pretrained(cls, model_path, config=None, layer_index=None, data_path=None, num_samples=400000):
         """
         Load pretrained layer and setup data collection.
         
@@ -251,7 +251,7 @@ class LlamaBlock(nn.Module):
             config: LlamaConfig
             layer_index: Index of this layer
             data_path: Path to save collected data (e.g., "/path/to/llama_3b_c4")
-            num_samples: Number of samples to collect
+            num_samples: Number of samples to collect (default 400000, same as OPT)
         """
         assert layer_index is not None
         if config is None:
