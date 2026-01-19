@@ -332,9 +332,15 @@ class LlamaBlock(nn.Module):
         residual = hidden_states
 
         # Collect attention input query (before RMSNorm)
-        if self.fp_att_query is not None and self.fp_i < self.fp_att_query.shape[0]:
-            _hidden = hidden_states.view(-1, hidden_states.size(-1))[mask.bool().view(-1)]
-            begin, end = self.fp_i, min(self.fp_i + _hidden.size(0), self.fp_att_query.shape[0])
+        # Only collect during prefill (when seq_len > 1), not during token generation
+        seq_len = hidden_states.size(1)
+        if self.fp_att_query is not None and self.fp_i < self.fp_att_query.shape[0] and seq_len > 1:
+            # During prefill: hidden_states is [batch, seq_len, hidden]
+            # Flatten and select valid positions based on mask
+            _hidden = hidden_states.view(-1, hidden_states.size(-1))
+            # Mask may be different shape, so just take all positions for prefill
+            num_tokens = _hidden.size(0)
+            begin, end = self.fp_i, min(self.fp_i + num_tokens, self.fp_att_query.shape[0])
             self.fp_att_query[begin:end] = _hidden[:end-begin].detach().cpu().numpy()
 
         # Attention
@@ -350,10 +356,12 @@ class LlamaBlock(nn.Module):
         hidden_states = residual + hidden_states
 
         # Collect MLP input query (before RMSNorm)
+        # Only collect during prefill (when seq_len > 1)
         residual = hidden_states
-        if self.fp_mlp_query is not None and self.fp_i < self.fp_mlp_query.shape[0]:
-            _hidden = hidden_states.view(-1, hidden_states.size(-1))[mask.bool().view(-1)]
-            begin, end = self.fp_i, min(self.fp_i + _hidden.size(0), self.fp_mlp_query.shape[0])
+        if self.fp_mlp_query is not None and self.fp_i < self.fp_mlp_query.shape[0] and seq_len > 1:
+            _hidden = hidden_states.view(-1, hidden_states.size(-1))
+            num_tokens = _hidden.size(0)
+            begin, end = self.fp_i, min(self.fp_i + num_tokens, self.fp_mlp_query.shape[0])
             self.fp_mlp_query[begin:end] = _hidden[:end-begin].detach().cpu().numpy()
 
         # MLP with data collection
@@ -369,13 +377,15 @@ class LlamaBlock(nn.Module):
         activation = self.act_fn(gate) * up
         
         # Collect MLP activation label
-        if self.fp_label is not None and self.fp_i < self.fp_label.shape[0]:
+        # Only collect during prefill (when seq_len > 1)
+        if self.fp_label is not None and self.fp_i < self.fp_label.shape[0] and seq_len > 1:
             # For Llama, we record the magnitude of activation (similar to how OPT records fc1 > 0)
             # But since SiLU doesn't create strict zeros, we record the actual values
-            _label = activation.view(-1, activation.size(-1))[mask.bool().view(-1)]
-            begin, end = self.fp_i, min(self.fp_i + _label.size(0), self.fp_label.shape[0])
+            _label = activation.view(-1, activation.size(-1))
+            num_tokens = _label.size(0)
+            begin, end = self.fp_i, min(self.fp_i + num_tokens, self.fp_label.shape[0])
             self.fp_label[begin:end] = _label[:end-begin].detach().cpu().numpy()
-            self.fp_i += _label.size(0)
+            self.fp_i += num_tokens
         
         hidden_states = self.mlp.down_proj(activation)
         hidden_states = residual + hidden_states
