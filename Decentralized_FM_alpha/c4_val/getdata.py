@@ -14,8 +14,8 @@ def dump_jsonl(data, output_path, append=False):
             f.write(json_record + "\n")
 
 
-# Use allenai/c4 which is the updated version
-dataset = load_dataset("allenai/c4", "en", split="validation", streaming=True, trust_remote_code=True)
+# Exact replication of OPT data collection setup
+dataset = load_dataset("allenai/c4", "en", split="train", streaming=True, trust_remote_code=True)
 dataset = dataset.shuffle(buffer_size=10000, seed=42)
 path = "c4_valid.jsonl"
 
@@ -34,6 +34,6 @@ for idx, doc in enumerate(tqdm(dataset)):
         "top_p": 1,
     }
     dump_jsonl([data], path, append=True)
-    if idx == 10000:
-        print(idx)
-        exit()
+    if idx == 500:
+        print("Collected 500 samples")
+        break

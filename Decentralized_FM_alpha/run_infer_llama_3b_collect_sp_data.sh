@@ -64,8 +64,8 @@ ARGS="--model-name ${model_path} \
 --fp16 \
 --num-layers 28 \
 --max-layers 28 \
---budget 32800 \
---num-iters 10000 \
+--budget 22800 \
+--num-iters 2000 \
 --dist-url tcp://127.0.0.1:9034 \
 --token-micro-batch-size 1 \
 --world-size 1 --pipeline-group-size 1 --data-group-size 1 \
