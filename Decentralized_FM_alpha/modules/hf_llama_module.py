@@ -492,6 +492,26 @@ class LlamaLMHead(nn.Module):
         return module
 
     def forward(self, x, input_ids=None):
+        # Debug: check input
+        if torch.isnan(x).any():
+            print(f"WARNING: NaN in LlamaLMHead input, shape={x.shape}")
+        if torch.isinf(x).any():
+            print(f"WARNING: Inf in LlamaLMHead input, shape={x.shape}")
+        
         x = self.norm(x)
+        
+        # Debug: check after norm
+        if torch.isnan(x).any():
+            print(f"WARNING: NaN after LlamaLMHead norm, shape={x.shape}")
+        if torch.isinf(x).any():
+            print(f"WARNING: Inf after LlamaLMHead norm, shape={x.shape}")
+        
         x = self.lm_head(x)
+        
+        # Debug: check output
+        if torch.isnan(x).any():
+            print(f"WARNING: NaN in LlamaLMHead output (logits), shape={x.shape}")
+        if torch.isinf(x).any():
+            print(f"WARNING: Inf in LlamaLMHead output (logits), shape={x.shape}")
+        
         return x
