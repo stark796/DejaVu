@@ -351,14 +351,21 @@ class LlamaBlock(nn.Module):
 
         module = torch.nn.utils.skip_init(cls, config, layer_index).eval()
         try:
-            module.load_state_dict(
-                torch.load(
-                    os.path.join(
-                        model_path,
-                        f"pytorch_{layer_index}.pt",
-                    )
-                )
-            )
+            state_dict_path = os.path.join(model_path, f"pytorch_{layer_index}.pt")
+            state_dict = torch.load(state_dict_path, map_location='cpu')
+            
+            # Debug: Print keys for first layer
+            if layer_index == 0:
+                print(f"Loading layer {layer_index} state dict keys: {list(state_dict.keys())[:5]}...")
+                print(f"Module expects keys: {list(module.state_dict().keys())[:5]}...")
+            
+            # Load with strict=False to see what's missing
+            missing, unexpected = module.load_state_dict(state_dict, strict=False)
+            if missing and layer_index == 0:
+                print(f"WARNING: Missing keys: {missing}")
+            if unexpected and layer_index == 0:
+                print(f"WARNING: Unexpected keys: {unexpected}")
+                
         except Exception as e:
             print(f"Cannot load layer {layer_index} from <model_name>. The model is randomly initialized. Error: {e}")
 

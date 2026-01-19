@@ -55,11 +55,11 @@ def convert_llama_checkpoint(model_name, save_path, use_auth_token=None):
     
     print(f"Loading model from {model_name}...")
     print("This may take a while for large models...")
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name, 
-        token=use_auth_token,
-        torch_dtype=torch.float16,  # Use fp16 to save memory
-        low_cpu_mem_usage=True,
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name, 
+            token=use_auth_token,
+            torch_dtype=torch.float16,  # Use fp16 to save memory
+            low_cpu_mem_usage=True,
     )
     
     state_dict = model.state_dict()
