@@ -242,7 +242,7 @@ class LlamaBlock(nn.Module):
         self.fp_label = None
 
     @classmethod
-    def from_pretrained(cls, model_path, config=None, layer_index=None, data_path=None, num_samples=400000):
+    def from_pretrained(cls, model_path, config=None, layer_index=None, data_path=None, num_samples=50000):
         """
         Load pretrained layer and setup data collection.
         
@@ -280,8 +280,7 @@ class LlamaBlock(nn.Module):
             dtype="float16", mode="w+",
             shape=(num_samples, config.hidden_size),
         )
-        # Initialize with zeros to avoid NaN from uninitialized memory
-        module.fp_mlp_query[:] = 0
+        # Don't initialize - too large, would cause bus error
         
         # Attention query: input to attention block (before RMSNorm)
         module.fp_att_query = np.memmap(
@@ -289,7 +288,6 @@ class LlamaBlock(nn.Module):
             dtype="float16", mode="w+",
             shape=(num_samples, config.hidden_size),
         )
-        module.fp_att_query[:] = 0
         
         # MLP label: activation pattern from gated MLP
         # Note: Llama uses gate_proj and up_proj, so intermediate_size is the label dimension
@@ -298,7 +296,6 @@ class LlamaBlock(nn.Module):
             dtype="float16", mode="w+",
             shape=(num_samples, config.intermediate_size),
         )
-        module.fp_label[:] = 0
         
         # Attention label: head importance scores
         module.self_attn.fp_i = 0
@@ -307,7 +304,6 @@ class LlamaBlock(nn.Module):
             dtype="float16", mode="w+",
             shape=(num_samples, config.num_attention_heads),
         )
-        module.self_attn.fp_label[:] = 0
 
         return module
 
