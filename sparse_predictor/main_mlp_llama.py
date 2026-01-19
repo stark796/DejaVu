@@ -48,7 +48,7 @@ CONFIG = {
         'intermediate': 8192,       # intermediate_size (for MLP)
         'h': 24,                   # num_attention_heads
         'kv_h': 8,                 # num_key_value_heads (GQA)
-        'N': 400000,               # number of samples to collect (same as OPT)
+        'N': 90000,               # number of samples collected (reduced due to bus error)
     },
 }
 
@@ -87,8 +87,8 @@ def get_data(args, layer_idx):
         print(f"Reading query from {path}")
         query = np.array(np.memmap(
             path, dtype='float16', mode='r',
-            shape=(400000, config['d'])
-        )[:config['N']])
+            shape=(config['N'], config['d'])
+        ))
         
         # Load MLP activation label
         # For Llama, this is the output of SiLU(gate) * up, shape is intermediate_size
@@ -96,8 +96,8 @@ def get_data(args, layer_idx):
         print(f"Reading MLP label from {path}")
         label = np.array(np.memmap(
             path, dtype='float16', mode='r',
-            shape=(400000, config['intermediate'])
-        )[:config['N']])
+            shape=(config['N'], config['intermediate'])
+        )
         
         return query, label
 
