@@ -48,7 +48,7 @@ CONFIG = {
         'intermediate': 8192,       # intermediate_size (for MLP)
         'h': 24,                   # num_attention_heads
         'kv_h': 8,                 # num_key_value_heads (GQA)
-        'N': 50000,                # number of samples to collect (reduced for faster training)
+        'N': 400000,               # number of samples to collect (same as OPT)
     },
 }
 

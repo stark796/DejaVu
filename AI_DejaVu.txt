@@ -1,0 +1,20 @@
+Aim: To run DejaVu for Llama3.2 3B and demonstrate that it fails in predicting the output accurately.
+ 
+https://arxiv.org/abs/2310.17157
+ 
+http://github.com/FMInference/DejaVu
+ 
+Steps:
+1) Reading paper isn’t that important. Go to the github repo and try to run OPT66B(it may not fit on the GPU but the goal is to first resolve all the dependencies like cuda version, transformers version, etc.)
+ 
+2) After it’s somewhat runnable, start modifying the scripts OPT. Duplicate them and re-write the scripts for Llama 3.2 3B. It’s mostly a Claude copy and paste task. Copy OPT scripts, give the structure of OPT and Llama 3.2 to Claude and let it modify the scripts. Do note down the summary of what’s changing so that it can be reviewed later for verification (IMPORTANT: These results will go into a paper so we don’t want to over-claim or falsify any information.)
+ 
+3) The github repo has the step by step procedure of the scripts to be launched. Look at each script, check what are the internal scripts it further calls.. they will be related to OPT. For example, https://github.com/FMInference/DejaVu/tree/master/Decentralized_FM_alpha/modules has some special OPT specific files. We will need to replicate the equivalent version for Llama. Either search using github’s UI or directly clone the repo and ‘find’ file names with opt. That will tell you if u need to make equivalent files for llama. GPT and Claude will be your friends here.
+ 
+a. Structure of OPT: https://github.com/huggingface/transformers/blob/main/src/transformers/models/opt/modeling_opt.py
+b. Structure of Llama: https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py
+ 
+4) Timeline: We want to prove that the approach taken by the authors of DejaVu fails on Llama. We need to get this thing running for Llama. In case you have any doubts, ask. You can read the paper in parallel though I suggest getting the repo running be the top priority.
+ 
+About the paper:
+The main idea of the paper is that they want to predict which parts of the LLM will run for a particular token. They do so, by the training a FC layer as the predictor that looks at the tokens and tells what portion of the model should be used. However, their base assumption from OPT models is that the embedding (‘vector representing each token’) doesn’t change much layer to layer so a token can be used to predict which parts of layer (located further down the model) will run. For Llama 3.2 3B, we saw that the token embeddings(vectors) change significantly from layer to layer and thus the predictor can’t be used for layer downstream. That’s what we want to prove.
