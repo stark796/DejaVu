@@ -188,14 +188,15 @@ class LlamaAttention(nn.Module):
 
         # Collect attention head importance: norm of each head's output
         # This is used as label for attention sparsity predictor
-        if self.fp_label is not None and self.fp_i < self.fp_label.shape[0] and mask is not None:
+        # Only collect during prefill (when q_len > 1), not during token generation
+        if self.fp_label is not None and self.fp_i < self.fp_label.shape[0] and q_len > 1:
             attn_output_norm = attn_output.norm(dim=-1)  # [bsz, num_heads, seq_len]
             attn_output_norm = attn_output_norm.transpose(2, 1).reshape(-1, self.num_heads)
-            attn_output_norm = attn_output_norm[mask.bool().view(-1)]
+            num_tokens = attn_output_norm.size(0)
             
-            begin, end = self.fp_i, min(self.fp_i + attn_output_norm.size(0), self.fp_label.shape[0])
+            begin, end = self.fp_i, min(self.fp_i + num_tokens, self.fp_label.shape[0])
             self.fp_label[begin:end] = attn_output_norm[:end-begin].detach().cpu().numpy()
-            self.fp_i += attn_output_norm.size(0)
+            self.fp_i += num_tokens
 
         attn_output = attn_output.transpose(1, 2).contiguous()
         attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
