@@ -48,7 +48,7 @@ CONFIG = {
         'intermediate': 8192,       # intermediate_size (for MLP)
         'h': 24,                   # num_attention_heads
         'kv_h': 8,                 # num_key_value_heads (GQA)
-        'N': 90000,               # number of samples collected (reduced due to bus error)
+        'N': 80000,               # number of samples (reduced to avoid edge of collected data)
     },
 }
 
