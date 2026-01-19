@@ -493,9 +493,13 @@ def get_tokenizer(args):
     else:
         # Support local paths with local_files_only flag
         import os
-        if os.path.isdir(args.model_name):
-            tokenizer = AutoTokenizer.from_pretrained(args.model_name, local_files_only=True)
+        # Convert to absolute path to handle both ./path and /absolute/path
+        model_path = os.path.abspath(args.model_name)
+        if os.path.isdir(model_path):
+            print(f"[DEBUG] Loading local model from {model_path} with local_files_only=True")
+            tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
         else:
+            print(f"[DEBUG] Loading model {args.model_name} from HuggingFace Hub")
             tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
     if tokenizer.pad_token is None:
