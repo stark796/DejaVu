@@ -242,7 +242,7 @@ class LlamaBlock(nn.Module):
         self.fp_label = None
 
     @classmethod
-    def from_pretrained(cls, model_path, config=None, layer_index=None, data_path=None, num_samples=400000):
+    def from_pretrained(cls, model_path, config=None, layer_index=None, data_path=None, num_samples=80000):
         """
         Load pretrained layer and setup data collection.
         
