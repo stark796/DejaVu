@@ -370,6 +370,11 @@ class LlamaBlock(nn.Module):
             print(f"Cannot load layer {layer_index} from <model_name>. The model is randomly initialized. Error: {e}")
 
         module.layer_index = layer_index
+        
+        # CRITICAL FIX: Reinitialize rotary embedding since skip_init doesn't initialize its buffers
+        # The LlamaRotaryEmbedding computes inv_freq in __init__, which is skipped by skip_init
+        module.self_attn.rotary_emb = LlamaRotaryEmbedding(config=config)
+        
         return module
 
     def forward(
