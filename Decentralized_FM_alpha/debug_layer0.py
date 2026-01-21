@@ -76,16 +76,8 @@ def main():
         print(f"    HF: range=[{hf_normed.min():.4f}, {hf_normed.max():.4f}]")
         print(f"    Diff: {norm_diff:.6f}")
         
-        # Check RoPE computation
-        print(f"\n  Checking RoPE...")
-        dv_cos, dv_sin = dv_block0.self_attn.rotary_emb(hf_normed, position_ids)
-        hf_cos, hf_sin = hf_layer0.self_attn.rotary_emb(hf_normed, position_ids)
-        
-        cos_diff = (dv_cos.float() - hf_cos.float()).abs().max().item()
-        sin_diff = (dv_sin.float() - hf_sin.float()).abs().max().item()
-        print(f"    DV cos shape: {dv_cos.shape}, sin shape: {dv_sin.shape}")
-        print(f"    HF cos shape: {hf_cos.shape}, sin shape: {hf_sin.shape}")
-        print(f"    cos diff: {cos_diff:.6f}, sin diff: {sin_diff:.6f}")
+        # Skipping direct RoPE check - different API in different transformers versions
+        # Go directly to Q/K/V projections
         
         # Check Q, K, V projections
         print(f"\n  Checking Q, K, V projections...")
