@@ -36,8 +36,10 @@ model_path=./pretrained_models/llama-3.2-3b
 
 # Sparse predictor settings
 export SPARSE_PATH=../checkpoint/llama-3b-sparse-predictor
-export MLP_TOPK=4500           # Number of active neurons (out of 8192) - matches training
-export ATT_TOPK=0.7            # Fraction of active attention heads
+# Sparsity Config
+# MLP_TOPK: 6144 / 12288 = 50% active (User Request)
+export MLP_TOPK=6144
+export ATT_TOPK=1.0            # 100% active heads (Dense Attention)            # Fraction of active attention heads
 
 # Create directories if needed
 mkdir -p ./c4_val
