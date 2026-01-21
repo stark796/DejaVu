@@ -305,6 +305,11 @@ class LlamaBlock(nn.Module):
             shape=(num_samples, config.num_attention_heads),
         )
 
+        # CRITICAL FIX: Reinitialize rotary embedding since skip_init doesn't initialize its buffers
+        # The LlamaRotaryEmbedding computes inv_freq in __init__, which is skipped by skip_init
+        from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
+        module.self_attn.rotary_emb = LlamaRotaryEmbedding(config=config)
+
         return module
 
     def forward(

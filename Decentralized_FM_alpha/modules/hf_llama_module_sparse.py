@@ -344,6 +344,10 @@ class LlamaSparseBlock(nn.Module):
         except Exception as e:
             print(f"Cannot load attention sparse predictor {layer_index}: {e}")
 
+        # CRITICAL FIX: Reinitialize rotary embedding since skip_init doesn't initialize its buffers
+        # The LlamaRotaryEmbedding computes inv_freq in __init__, which is skipped by skip_init
+        module.self_attn.rotary_emb = LlamaRotaryEmbedding(config=config)
+
         return module
 
     def forward(
