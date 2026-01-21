@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 """
-Debug RoPE: HF stores rotary_emb differently in newer versions.
-Let's find it and compare.
+CRITICAL FIX: Compare HF's global RoPE vs DV's layer RoPE.
+The issue is that HF stores rotary_emb at model level, not layer level.
 """
 
 import torch
+import math
 import os
 import sys
 
@@ -12,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def main():
     print("=" * 60)
-    print("Finding and Comparing RoPE")
+    print("Comparing Global RoPE vs Layer RoPE")
     print("=" * 60)
     
     model_path = "./pretrained_models/llama-3.2-3b"
@@ -35,84 +36,58 @@ def main():
     dv_emb = LlamaEmbeddings.from_pretrained(model_path).cuda().half()
     dv_block0 = LlamaBlock.from_pretrained(model_path, layer_index=0).cuda().half()
     
-    hf_layer0 = hf_model.model.layers[0]
-    
-    # Find where HF stores rotary_emb
-    print("\n[2] Finding HF rotary embedding location...")
-    
-    # Check model level
-    if hasattr(hf_model.model, 'rotary_emb'):
-        print("  Found at: hf_model.model.rotary_emb")
-        hf_rope = hf_model.model.rotary_emb
-    else:
-        print("  Not at model level. Checking layer...")
-        
-    # Check layer level
-    if hasattr(hf_layer0.self_attn, 'rotary_emb'):
-        print("  Found at: hf_layer0.self_attn.rotary_emb")
-        hf_rope = hf_layer0.self_attn.rotary_emb
-    else:
-        print("  Not at layer.self_attn level")
-    
-    # List all attributes of self_attn
-    print("\n  HF self_attn attributes:")
-    for attr in dir(hf_layer0.self_attn):
-        if not attr.startswith('_'):
-            obj = getattr(hf_layer0.self_attn, attr, None)
-            if hasattr(obj, '__class__') and 'Module' in str(type(obj)):
-                print(f"    {attr}: {type(obj)}")
-    
-    # Check DejaVu
-    print("\n[3] DejaVu RoPE location...")
+    # Get both RoPE instances
+    hf_rope = hf_model.model.rotary_emb
     dv_rope = dv_block0.self_attn.rotary_emb
-    print(f"  Found at: dv_block0.self_attn.rotary_emb")
-    print(f"  Type: {type(dv_rope)}")
     
-    # Compare configs
-    print("\n[4] Config comparison...")
-    print(f"  DV config rope_theta: {config.rope_theta}")
-    print(f"  DV head_dim: {config.hidden_size // config.num_attention_heads}")
+    print(f"\n[2] RoPE comparison...")
+    print(f"  HF RoPE type: {type(hf_rope)}")
+    print(f"  DV RoPE type: {type(dv_rope)}")
     
-    # Generate cos/sin with DV rope
-    print("\n[5] Testing DV RoPE output...")
+    # Check inv_freq if available
+    if hasattr(hf_rope, 'inv_freq') and hf_rope.inv_freq is not None:
+        print(f"\n  HF inv_freq[:5]: {hf_rope.inv_freq[:5]}")
+    if hasattr(dv_rope, 'inv_freq') and dv_rope.inv_freq is not None:
+        print(f"  DV inv_freq[:5]: {dv_rope.inv_freq[:5]}")
+    
+    # Generate cos/sin
     seq_len = 6
     position_ids = torch.arange(0, seq_len, dtype=torch.long, device="cuda").unsqueeze(0)
     dummy_v = torch.randn(1, 8, seq_len, 128, dtype=torch.float16, device="cuda")
     
+    hf_cos, hf_sin = hf_rope(dummy_v, position_ids)
     dv_cos, dv_sin = dv_rope(dummy_v, position_ids)
-    print(f"  DV cos shape: {dv_cos.shape}")
-    print(f"  DV cos[0,0,:5]: {dv_cos[0,0,:5]}")
-    print(f"  DV sin[0,0,:5]: {dv_sin[0,0,:5]}")
     
-    # Now directly look at what the HF forward does
-    print("\n[6] Tracing HF forward exactly...")
+    print(f"\n[3] cos/sin comparison...")
+    print(f"  HF cos shape: {hf_cos.shape}")
+    print(f"  DV cos shape: {dv_cos.shape}")
+    
+    cos_diff = (hf_cos - dv_cos).abs().max().item()
+    sin_diff = (hf_sin - dv_sin).abs().max().item()
+    print(f"\n  cos diff: {cos_diff:.6f}")
+    print(f"  sin diff: {sin_diff:.6f}")
+    
+    if cos_diff > 0:
+        print(f"\n  *** RoPE cos/sin VALUES DIFFER! ***")
+        print(f"  HF cos[0,0,:5]: {hf_cos[0,0,:5]}")
+        print(f"  DV cos[0,0,:5]: {dv_cos[0,0,:5]}")
+        print(f"  HF sin[0,0,:5]: {hf_sin[0,0,:5]}")
+        print(f"  DV sin[0,0,:5]: {dv_sin[0,0,:5]}")
+        
+        # Check at position 5 (last position)
+        print(f"\n  At position 5:")
+        print(f"  HF cos[0,5,:5]: {hf_cos[0,5,:5]}")
+        print(f"  DV cos[0,5,:5]: {dv_cos[0,5,:5]}")
+    
+    # Now test: use HF's RoPE in DV's computation
+    print(f"\n[4] Testing DV computation with HF's RoPE...")
     
     text = "The cat sat on the"
     inputs = tokenizer(text, return_tensors="pt")
     input_ids = inputs["input_ids"].cuda()
     
     with torch.no_grad():
-        # Run full HF model and capture internal states
-        hf_out = hf_model(input_ids, output_hidden_states=True, output_attentions=True)
-        
-        # Get layer 0 output
-        hf_layer0_out = hf_out.hidden_states[1]
-        
-        # Now run DV
         dv_hidden = dv_emb(input_ids)
-        dv_layer0_out, _ = dv_block0(dv_hidden, layer_past=None, mask=None)
-        
-        layer_diff = (dv_layer0_out - hf_layer0_out).abs().max().item()
-        print(f"\n  Layer 0 output diff: {layer_diff:.6f}")
-        
-        # Let's check if HF attention pattern differs
-        if hf_out.attentions is not None:
-            hf_attn = hf_out.attentions[0]  # Layer 0 attention
-            print(f"  HF attention shape: {hf_attn.shape}")
-            print(f"  HF attention[0,0,:,:] (first head):")
-            print(hf_attn[0, 0])
-            
-        # Run DV attention and compare patterns
         dv_normed = dv_block0.input_layernorm(dv_hidden)
         
         num_heads = config.num_attention_heads
@@ -123,33 +98,45 @@ def main():
         dv_k = dv_block0.self_attn.k_proj(dv_normed).view(1, seq_len, num_kv_heads, head_dim).transpose(1, 2)
         dv_v = dv_block0.self_attn.v_proj(dv_normed).view(1, seq_len, num_kv_heads, head_dim).transpose(1, 2)
         
-        # RoPE
         from transformers.models.llama.modeling_llama import apply_rotary_pos_emb, repeat_kv
-        dv_cos, dv_sin = dv_rope(dv_v, position_ids)
-        dv_q_rot, dv_k_rot = apply_rotary_pos_emb(dv_q, dv_k, dv_cos, dv_sin)
-        
-        # GQA
-        import math
-        dv_k_rot = repeat_kv(dv_k_rot, num_heads // num_kv_heads)
-        dv_v_exp = repeat_kv(dv_v, num_heads // num_kv_heads)
-        
-        # Attention weights
-        dv_attn_weights = torch.matmul(dv_q_rot, dv_k_rot.transpose(2, 3)) / math.sqrt(head_dim)
-        
-        # Apply causal mask
         from modules.hf_llama_module import _make_causal_mask
+        
+        # WITH HF's RoPE
+        hf_cos, hf_sin = hf_rope(dv_v, position_ids)
+        q_hf, k_hf = apply_rotary_pos_emb(dv_q, dv_k, hf_cos, hf_sin)
+        
+        k_hf = repeat_kv(k_hf, num_heads // num_kv_heads)
+        v_exp = repeat_kv(dv_v, num_heads // num_kv_heads)
+        
+        attn_hf = torch.matmul(q_hf, k_hf.transpose(2, 3)) / math.sqrt(head_dim)
         causal_mask = _make_causal_mask((1, seq_len), dv_hidden.dtype, dv_hidden.device)
-        dv_attn_weights = dv_attn_weights + causal_mask
+        attn_hf = attn_hf + causal_mask
+        attn_hf = torch.nn.functional.softmax(attn_hf, dim=-1, dtype=torch.float32).to(dv_hidden.dtype)
         
-        # Softmax
-        dv_attn_probs = torch.nn.functional.softmax(dv_attn_weights, dim=-1, dtype=torch.float32).to(dv_hidden.dtype)
+        attn_out_hf = torch.matmul(attn_hf, v_exp)
+        attn_out_hf = attn_out_hf.transpose(1, 2).contiguous().reshape(1, seq_len, -1)
+        attn_out_hf = dv_block0.self_attn.o_proj(attn_out_hf)
         
-        print(f"\n  DV attention[0,0,:,:] (first head):")
-        print(dv_attn_probs[0, 0])
+        hidden_after_attn = dv_hidden + attn_out_hf
+        mlp_input = dv_block0.post_attention_layernorm(hidden_after_attn)
+        mlp_out = dv_block0.mlp(mlp_input)
+        final_with_hf_rope = hidden_after_attn + mlp_out
         
-        if hf_out.attentions is not None:
-            attn_diff = (dv_attn_probs - hf_attn).abs().max().item()
-            print(f"\n  Attention pattern diff: {attn_diff:.6f}")
+        # Compare with actual HF output
+        hf_out = hf_model(input_ids, output_hidden_states=True)
+        hf_layer0_out = hf_out.hidden_states[1]
+        
+        diff_with_hf_rope = (final_with_hf_rope - hf_layer0_out).abs().max().item()
+        print(f"  DV (with HF's RoPE) vs HF layer: {diff_with_hf_rope:.6f}")
+        
+        # Also compare with DV's own layer output
+        dv_layer_out, _ = dv_block0(dv_hidden, layer_past=None, mask=None)
+        diff_dv_layer = (dv_layer_out - hf_layer0_out).abs().max().item()
+        print(f"  DV layer (own RoPE) vs HF layer: {diff_dv_layer:.6f}")
+        
+        if diff_with_hf_rope < diff_dv_layer:
+            print(f"\n  *** CONFIRMED: Using HF's RoPE reduces diff! ***")
+            print(f"  Improvement: {diff_dv_layer - diff_with_hf_rope:.6f}")
     
     print("\n" + "=" * 60)
     print("Done!")
