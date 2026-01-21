@@ -283,7 +283,7 @@ class DistGreedyInferenceMaskTokenPipeSync(DistGreedyInferenceTokePipeSync):
 
             config = GPTConfig.from_pretrained(self.model_name)
             return config.hidden_size
-        elif self.model_type in ["llama", "llama-save"]:
+        elif self.model_type in ["llama", "llama-save", "llama-sparse"]:
             from transformers import LlamaConfig
 
             config = LlamaConfig.from_pretrained(self.model_name)
@@ -328,6 +328,12 @@ class DistGreedyInferenceMaskTokenPipeSync(DistGreedyInferenceTokePipeSync):
             from modules.hf_llama_module_save import (
                 LlamaEmbeddings as GPTEmbeddings,
                 LlamaBlock as GPTBlock,
+                LlamaLMHead as GPTLMHead,
+            )
+        elif self.model_type == "llama-sparse":
+            from modules.hf_llama_module_sparse import (
+                LlamaEmbeddings as GPTEmbeddings,
+                LlamaSparseBlock as GPTBlock,
                 LlamaLMHead as GPTLMHead,
             )
         elif self.model_type == "yalm":
