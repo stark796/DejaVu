@@ -1,127 +1,151 @@
 #!/usr/bin/env python
 """
-Debug script to trace exactly where the forward pass diverges.
-Simplified version that works with newer transformers API.
+Simplified debug: Compare DejaVu internal operations vs expected.
+Tests causal mask and RoPE directly.
 """
 
 import torch
+import math
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def main():
+    print("=" * 60)
+    print("Testing Causal Mask and Attention")
+    print("=" * 60)
+    
     model_path = "./pretrained_models/llama-3.2-3b"
     
-    print("=" * 60)
-    print("Detailed Layer 0 Trace")
-    print("=" * 60)
-    
-    # 1. Load HuggingFace model
-    print("\n[1] Loading HuggingFace model...")
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-    hf_model = AutoModelForCausalLM.from_pretrained(
-        "meta-llama/Llama-3.2-3B",
-        torch_dtype=torch.float16,
-        device_map="cuda"
+    # Load DejaVu model
+    print("\n[1] Loading DejaVu model...")
+    from modules.hf_llama_module import (
+        LlamaEmbeddings, LlamaBlock, LlamaLMHead,
+        _make_causal_mask, _prepare_decoder_attention_mask
     )
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-3B")
-    
-    # 2. Load DejaVu model
-    print("\n[2] Loading DejaVu model...")
-    from modules.hf_llama_module import LlamaEmbeddings, LlamaBlock, LlamaLMHead
-    from transformers import LlamaConfig
+    from transformers import LlamaConfig, AutoTokenizer
     
     config = LlamaConfig.from_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
     
     dv_emb = LlamaEmbeddings.from_pretrained(model_path).cuda().half()
     dv_block0 = LlamaBlock.from_pretrained(model_path, layer_index=0).cuda().half()
     
-    # 3. Prepare input
-    print("\n[3] Preparing input...")
+    # Prepare input
+    print("\n[2] Preparing input...")
     text = "The cat sat on the"
     inputs = tokenizer(text, return_tensors="pt")
     input_ids = inputs["input_ids"].cuda()
     print(f"  Input: '{text}'")
-    print(f"  Token IDs: {input_ids}")
-    
-    # 4. Get embeddings
-    print("\n[4] Getting embeddings...")
-    with torch.no_grad():
-        dv_hidden = dv_emb(input_ids)
-        hf_hidden = hf_model.model.embed_tokens(input_ids)
-        
-    print(f"  DV emb: shape={dv_hidden.shape}, range=[{dv_hidden.min():.4f}, {dv_hidden.max():.4f}]")
-    print(f"  HF emb: shape={hf_hidden.shape}, range=[{hf_hidden.min():.4f}, {hf_hidden.max():.4f}]")
-    emb_diff = (dv_hidden.float() - hf_hidden.float()).abs().max().item()
-    print(f"  Diff: {emb_diff:.6f}")
-    
-    # 5. Trace layer 0
-    print("\n[5] Tracing layer 0...")
-    
-    hf_layer0 = hf_model.model.layers[0]
+    print(f"  Tokens: {input_ids.shape}")
     
     with torch.no_grad():
-        seq_len = input_ids.size(1)
-        position_ids = torch.arange(0, seq_len, dtype=torch.long, device="cuda").unsqueeze(0)
-        print(f"  Position IDs: {position_ids}")
+        hidden = dv_emb(input_ids)
         
-        # Input layernorm
-        dv_normed = dv_block0.input_layernorm(dv_hidden)
-        hf_normed = hf_layer0.input_layernorm(hf_hidden)
-        norm_diff = (dv_normed.float() - hf_normed.float()).abs().max().item()
-        print(f"\n  input_layernorm diff: {norm_diff:.6f}")
-        
-        # Q, K, V projections
-        dv_q = dv_block0.self_attn.q_proj(dv_normed)
-        hf_q = hf_layer0.self_attn.q_proj(hf_normed)
-        q_diff = (dv_q.float() - hf_q.float()).abs().max().item()
-        print(f"  Q projection diff: {q_diff:.6f}")
-        
-        dv_k = dv_block0.self_attn.k_proj(dv_normed)
-        hf_k = hf_layer0.self_attn.k_proj(hf_normed)
-        k_diff = (dv_k.float() - hf_k.float()).abs().max().item()
-        print(f"  K projection diff: {k_diff:.6f}")
-        
-        dv_v = dv_block0.self_attn.v_proj(dv_normed)
-        hf_v = hf_layer0.self_attn.v_proj(hf_normed)
-        v_diff = (dv_v.float() - hf_v.float()).abs().max().item()
-        print(f"  V projection diff: {v_diff:.6f}")
-        
-        # Full layer comparison
-        print(f"\n  Running full layer 0...")
-        
-        # DejaVu - WITHOUT passing position_ids (uses internally generated)
-        dv_layer_out, _ = dv_block0(dv_hidden, layer_past=None, mask=None)
-        
-        # HuggingFace
-        hf_layer_out = hf_layer0(hf_hidden, position_ids=position_ids)[0]
-        
-        layer_diff = (dv_layer_out.float() - hf_layer_out.float()).abs().max().item()
-        print(f"    DV layer0 out: range=[{dv_layer_out.min():.4f}, {dv_layer_out.max():.4f}]")
-        print(f"    HF layer0 out: range=[{hf_layer_out.min():.4f}, {hf_layer_out.max():.4f}]")
-        print(f"    Layer 0 output diff (DV uses internal pos_ids): {layer_diff:.6f}")
-        
-        # DejaVu - WITH explicit position_ids
-        dv_layer_out2, _ = dv_block0(dv_hidden, layer_past=None, mask=None, position_ids=position_ids)
-        layer_diff2 = (dv_layer_out2.float() - hf_layer_out.float()).abs().max().item()
-        print(f"    Layer 0 output diff (DV uses explicit pos_ids): {layer_diff2:.6f}")
-        
-        if layer_diff2 > 0.01:
-            print("\n  *** OUTPUTS DIFFER SIGNIFICANTLY ***")
-            print("  Checking internal difference...")
-            
-            # Compare DV with and without explicit position_ids
-            internal_diff = (dv_layer_out.float() - dv_layer_out2.float()).abs().max().item()
-            print(f"    DV (internal pos_ids) vs DV (explicit pos_ids): {internal_diff:.6f}")
-            
-            if internal_diff > 0.001:
-                print("    --> Position IDs are being generated differently!")
-            else:
-                print("    --> Position IDs match, issue is elsewhere in attention")
-        else:
-            print("\n  ✓ Layer 0 outputs match well!")
-        
+    print(f"  Hidden shape: {hidden.shape}")
+    
+    # Test causal mask
+    print("\n[3] Testing causal mask...")
+    bsz, seq_len, _ = hidden.shape
+    
+    causal_mask = _make_causal_mask(
+        (bsz, seq_len), hidden.dtype, hidden.device, past_key_values_length=0
+    )
+    print(f"  Causal mask shape: {causal_mask.shape}")
+    print(f"  Causal mask (position 0 can see):")
+    print(f"    {causal_mask[0, 0, 0, :].tolist()}")
+    print(f"  Causal mask (position 5 can see):")
+    print(f"    {causal_mask[0, 0, 5, :].tolist()}")
+    
+    # Expected: position 0 sees only position 0 (rest is -inf)
+    # Position 5 sees all positions (all 0)
+    pos0_visible = (causal_mask[0, 0, 0, :] == 0).sum().item()
+    pos5_visible = (causal_mask[0, 0, 5, :] == 0).sum().item()
+    print(f"  Position 0 can see {pos0_visible} positions (expected: 1)")
+    print(f"  Position 5 can see {pos5_visible} positions (expected: 6)")
+    
+    if pos0_visible != 1 or pos5_visible != 6:
+        print("\n  *** CAUSAL MASK IS WRONG! ***")
+    else:
+        print("\n  ✓ Causal mask looks correct")
+    
+    # Test attention manually
+    print("\n[4] Testing attention computation...")
+    
+    normed = dv_block0.input_layernorm(hidden)
+    
+    # Get Q, K, V
+    q = dv_block0.self_attn.q_proj(normed)
+    k = dv_block0.self_attn.k_proj(normed)
+    v = dv_block0.self_attn.v_proj(normed)
+    
+    # Reshape for attention
+    num_heads = config.num_attention_heads
+    num_kv_heads = config.num_key_value_heads
+    head_dim = config.hidden_size // num_heads
+    
+    q = q.view(bsz, seq_len, num_heads, head_dim).transpose(1, 2)  # [bsz, heads, seq, dim]
+    k = k.view(bsz, seq_len, num_kv_heads, head_dim).transpose(1, 2)
+    v = v.view(bsz, seq_len, num_kv_heads, head_dim).transpose(1, 2)
+    
+    print(f"  Q shape: {q.shape}")
+    print(f"  K shape: {k.shape}")
+    print(f"  V shape: {v.shape}")
+    
+    # RoPE
+    from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding, apply_rotary_pos_emb
+    
+    position_ids = torch.arange(0, seq_len, dtype=torch.long, device="cuda").unsqueeze(0)
+    
+    rotary_emb = dv_block0.self_attn.rotary_emb
+    cos, sin = rotary_emb(v, position_ids)
+    
+    print(f"  cos shape: {cos.shape}")
+    print(f"  sin shape: {sin.shape}")
+    
+    q_rot, k_rot = apply_rotary_pos_emb(q, k, cos, sin)
+    
+    print(f"  Q after RoPE: range=[{q_rot.min():.4f}, {q_rot.max():.4f}]")
+    print(f"  K after RoPE: range=[{k_rot.min():.4f}, {k_rot.max():.4f}]")
+    
+    # Compute attention weights
+    from transformers.models.llama.modeling_llama import repeat_kv
+    
+    num_kv_groups = num_heads // num_kv_heads
+    k_rot = repeat_kv(k_rot, num_kv_groups)
+    v = repeat_kv(v, num_kv_groups)
+    
+    attn_weights = torch.matmul(q_rot, k_rot.transpose(2, 3)) / math.sqrt(head_dim)
+    
+    print(f"\n  Raw attn weights (before mask): range=[{attn_weights.min():.4f}, {attn_weights.max():.4f}]")
+    
+    # Apply causal mask
+    attn_mask = _prepare_decoder_attention_mask(
+        None, (bsz, seq_len), hidden, 0
+    )
+    
+    if attn_mask is not None:
+        attn_weights = attn_weights + attn_mask
+        print(f"  Attn weights (after mask): range=[{attn_weights.min():.4f}, {attn_weights.max():.4f}]")
+    
+    # Softmax
+    attn_weights = torch.nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(hidden.dtype)
+    print(f"  Attn weights (after softmax): range=[{attn_weights.min():.4f}, {attn_weights.max():.4f}]")
+    
+    # Check: first token attention should be 100% on first token
+    first_token_attn = attn_weights[0, 0, 0, :]  # head 0, position 0
+    print(f"\n  First token attention distribution: {first_token_attn.tolist()}")
+    if first_token_attn[0].item() > 0.99:
+        print("  ✓ First token correctly attends only to itself")
+    else:
+        print("  *** First token attention is wrong! ***")
+    
+    # Run full layer
+    print("\n[5] Running full layer...")
+    layer_out, _ = dv_block0(hidden, layer_past=None, mask=None)
+    print(f"  Layer output: range=[{layer_out.min():.4f}, {layer_out.max():.4f}]")
+    
     print("\n" + "=" * 60)
     print("Done!")
     print("=" * 60)
