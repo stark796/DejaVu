@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Debug script to trace exactly where the forward pass diverges.
-Compares attention and MLP outputs separately.
+Simplified version that works with newer transformers API.
 """
 
 import torch
@@ -56,13 +56,12 @@ def main():
     emb_diff = (dv_hidden.float() - hf_hidden.float()).abs().max().item()
     print(f"  Diff: {emb_diff:.6f}")
     
-    # 5. Manually trace through layer 0
-    print("\n[5] Tracing layer 0 step by step...")
+    # 5. Trace layer 0
+    print("\n[5] Tracing layer 0...")
     
     hf_layer0 = hf_model.model.layers[0]
     
     with torch.no_grad():
-        # Create position_ids
         seq_len = input_ids.size(1)
         position_ids = torch.arange(0, seq_len, dtype=torch.long, device="cuda").unsqueeze(0)
         print(f"  Position IDs: {position_ids}")
@@ -71,79 +70,57 @@ def main():
         dv_normed = dv_block0.input_layernorm(dv_hidden)
         hf_normed = hf_layer0.input_layernorm(hf_hidden)
         norm_diff = (dv_normed.float() - hf_normed.float()).abs().max().item()
-        print(f"\n  After input_layernorm:")
-        print(f"    DV: range=[{dv_normed.min():.4f}, {dv_normed.max():.4f}]")
-        print(f"    HF: range=[{hf_normed.min():.4f}, {hf_normed.max():.4f}]")
-        print(f"    Diff: {norm_diff:.6f}")
+        print(f"\n  input_layernorm diff: {norm_diff:.6f}")
         
-        # Skipping direct RoPE check - different API in different transformers versions
-        # Go directly to Q/K/V projections
-        
-        # Check Q, K, V projections
-        print(f"\n  Checking Q, K, V projections...")
+        # Q, K, V projections
         dv_q = dv_block0.self_attn.q_proj(dv_normed)
-        dv_k = dv_block0.self_attn.k_proj(dv_normed)
-        dv_v = dv_block0.self_attn.v_proj(dv_normed)
-        
         hf_q = hf_layer0.self_attn.q_proj(hf_normed)
-        hf_k = hf_layer0.self_attn.k_proj(hf_normed)
-        hf_v = hf_layer0.self_attn.v_proj(hf_normed)
-        
         q_diff = (dv_q.float() - hf_q.float()).abs().max().item()
+        print(f"  Q projection diff: {q_diff:.6f}")
+        
+        dv_k = dv_block0.self_attn.k_proj(dv_normed)
+        hf_k = hf_layer0.self_attn.k_proj(hf_normed)
         k_diff = (dv_k.float() - hf_k.float()).abs().max().item()
+        print(f"  K projection diff: {k_diff:.6f}")
+        
+        dv_v = dv_block0.self_attn.v_proj(dv_normed)
+        hf_v = hf_layer0.self_attn.v_proj(hf_normed)
         v_diff = (dv_v.float() - hf_v.float()).abs().max().item()
-        print(f"    Q diff: {q_diff:.6f}")
-        print(f"    K diff: {k_diff:.6f}")
-        print(f"    V diff: {v_diff:.6f}")
+        print(f"  V projection diff: {v_diff:.6f}")
         
-        # Run full attention
-        print(f"\n  Running full attention...")
-        dv_attn_out, _, _ = dv_block0.self_attn(
-            hidden_states=dv_normed,
-            position_ids=position_ids,
-        )
+        # Full layer comparison
+        print(f"\n  Running full layer 0...")
         
-        # For HF we need to create attention mask
-        hf_attn_out, _, _ = hf_layer0.self_attn(
-            hidden_states=hf_normed,
-            position_ids=position_ids,
-        )
+        # DejaVu - WITHOUT passing position_ids (uses internally generated)
+        dv_layer_out, _ = dv_block0(dv_hidden, layer_past=None, mask=None)
         
-        attn_diff = (dv_attn_out.float() - hf_attn_out.float()).abs().max().item()
-        print(f"    DV attn out: range=[{dv_attn_out.min():.4f}, {dv_attn_out.max():.4f}]")
-        print(f"    HF attn out: range=[{hf_attn_out.min():.4f}, {hf_attn_out.max():.4f}]")
-        print(f"    Attn output diff: {attn_diff:.6f}")
+        # HuggingFace
+        hf_layer_out = hf_layer0(hf_hidden, position_ids=position_ids)[0]
         
-        # Residual + post-attn norm
-        dv_hidden2 = dv_hidden + dv_attn_out
-        hf_hidden2 = hf_hidden + hf_attn_out
+        layer_diff = (dv_layer_out.float() - hf_layer_out.float()).abs().max().item()
+        print(f"    DV layer0 out: range=[{dv_layer_out.min():.4f}, {dv_layer_out.max():.4f}]")
+        print(f"    HF layer0 out: range=[{hf_layer_out.min():.4f}, {hf_layer_out.max():.4f}]")
+        print(f"    Layer 0 output diff (DV uses internal pos_ids): {layer_diff:.6f}")
         
-        dv_mlp_input = dv_block0.post_attention_layernorm(dv_hidden2)
-        hf_mlp_input = hf_layer0.post_attention_layernorm(hf_hidden2)
+        # DejaVu - WITH explicit position_ids
+        dv_layer_out2, _ = dv_block0(dv_hidden, layer_past=None, mask=None, position_ids=position_ids)
+        layer_diff2 = (dv_layer_out2.float() - hf_layer_out.float()).abs().max().item()
+        print(f"    Layer 0 output diff (DV uses explicit pos_ids): {layer_diff2:.6f}")
         
-        post_norm_diff = (dv_mlp_input.float() - hf_mlp_input.float()).abs().max().item()
-        print(f"\n  After post_attention_layernorm:")
-        print(f"    Diff: {post_norm_diff:.6f}")
-        
-        # MLP
-        dv_mlp_out = dv_block0.mlp(dv_mlp_input)
-        hf_mlp_out = hf_layer0.mlp(hf_mlp_input)
-        
-        mlp_diff = (dv_mlp_out.float() - hf_mlp_out.float()).abs().max().item()
-        print(f"\n  MLP output:")
-        print(f"    DV: range=[{dv_mlp_out.min():.4f}, {dv_mlp_out.max():.4f}]")
-        print(f"    HF: range=[{hf_mlp_out.min():.4f}, {hf_mlp_out.max():.4f}]")
-        print(f"    Diff: {mlp_diff:.6f}")
-        
-        # Final layer output
-        dv_final = dv_hidden2 + dv_mlp_out
-        hf_final = hf_hidden2 + hf_mlp_out
-        
-        final_diff = (dv_final.float() - hf_final.float()).abs().max().item()
-        print(f"\n  Final layer 0 output:")
-        print(f"    DV: range=[{dv_final.min():.4f}, {dv_final.max():.4f}]")
-        print(f"    HF: range=[{hf_final.min():.4f}, {hf_final.max():.4f}]")
-        print(f"    Diff: {final_diff:.6f}")
+        if layer_diff2 > 0.01:
+            print("\n  *** OUTPUTS DIFFER SIGNIFICANTLY ***")
+            print("  Checking internal difference...")
+            
+            # Compare DV with and without explicit position_ids
+            internal_diff = (dv_layer_out.float() - dv_layer_out2.float()).abs().max().item()
+            print(f"    DV (internal pos_ids) vs DV (explicit pos_ids): {internal_diff:.6f}")
+            
+            if internal_diff > 0.001:
+                print("    --> Position IDs are being generated differently!")
+            else:
+                print("    --> Position IDs match, issue is elsewhere in attention")
+        else:
+            print("\n  ✓ Layer 0 outputs match well!")
         
     print("\n" + "=" * 60)
     print("Done!")
