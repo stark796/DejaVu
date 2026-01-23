@@ -23,6 +23,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true", default=False)
     parser.add_argument("--num-fewshot", type=int, default=0)
     parser.add_argument("--num-data", type=int, default=None)
+    parser.add_argument("--output-json", type=str, default=None, help="Path to save the evaluation summary JSON")
     args = parser.parse_args()
 
     if args.model_type == "opt":
@@ -165,3 +166,8 @@ if __name__ == "__main__":
     else:
         print("No 'results' key found in output.")
     print("="*40)
+
+    if args.output_json:
+        with open(args.output_json, "w") as f:
+            f.write(dumped)
+        print(f"Results saved to {args.output_json}")
