@@ -60,14 +60,13 @@ if __name__ == "__main__":
     task_manager = TaskManager()
     
     results = evaluator.evaluate(
-        adaptor,
-        tasks.get_task_dict(
+        model=adaptor,
+        task_dict=tasks.get_task_dict(
             [args.task_name],
             task_manager=task_manager
         ),
-        False,
-        args.num_fewshot,
-        args.num_data,
+        num_fewshot=args.num_fewshot,
+        limit=args.num_data,
     )
     # dumped = json.dumps(results, indent=2)
     # print(dumped)
