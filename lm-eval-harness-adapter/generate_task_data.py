@@ -65,27 +65,35 @@ if __name__ == "__main__":
     )
 
     # Set fewshot count on tasks manually if the evaluator doesn't accept it
+    # Function to recursively set fewshot
+    def set_fewshot(t_obj, n_shots):
+        if isinstance(t_obj, dict):
+            # If it looks like a task config dict (has 'task' or 'config' keys), try setting it
+            if 'config' in t_obj and isinstance(t_obj['config'], dict):
+                t_obj['config']['num_fewshot'] = n_shots
+            elif 'num_fewshot' in t_obj:
+                 t_obj['num_fewshot'] = n_shots
+            
+            # Recurse into values if it is a container of tasks
+            for k, v in t_obj.items():
+                if isinstance(v, (dict, object)) and not isinstance(v, (int, float, str, bool)):
+                    set_fewshot(v, n_shots)
+        else:
+            # Assume it's a Task object
+            if hasattr(t_obj, 'config') and hasattr(t_obj.config, 'num_fewshot'):
+                t_obj.config.num_fewshot = n_shots
+            
+            try:
+                t_obj.num_fewshot = n_shots
+            except AttributeError:
+                pass
+            
+            if hasattr(t_obj, 'set_num_fewshot'):
+                t_obj.set_num_fewshot(n_shots)
+
     if args.num_fewshot is not None:
         for task_name, task_obj in task_dict.items():
-            if isinstance(task_obj, dict):
-                # If it's a dictionary (maybe config dict), set the key directly
-                task_obj['num_fewshot'] = args.num_fewshot
-                if 'config' in task_obj and isinstance(task_obj['config'], dict):
-                    task_obj['config']['num_fewshot'] = args.num_fewshot
-            else:
-                # Assume it's an object
-                if hasattr(task_obj, 'config') and hasattr(task_obj.config, 'num_fewshot'):
-                     # lm-eval 0.4+
-                    task_obj.config.num_fewshot = args.num_fewshot
-                
-                # Try setting attribute directly
-                try:
-                    task_obj.num_fewshot = args.num_fewshot
-                except AttributeError:
-                    pass
-                
-                if hasattr(task_obj, 'set_num_fewshot'):
-                     task_obj.set_num_fewshot(args.num_fewshot)
+            set_fewshot(task_obj, args.num_fewshot)
 
     results = evaluator.evaluate(
         lm=adaptor,
