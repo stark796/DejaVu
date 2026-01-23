@@ -67,13 +67,25 @@ if __name__ == "__main__":
     # Set fewshot count on tasks manually if the evaluator doesn't accept it
     if args.num_fewshot is not None:
         for task_name, task_obj in task_dict.items():
-            if hasattr(task_obj, 'config') and hasattr(task_obj.config, 'num_fewshot'):
-                 # lm-eval 0.4+
-                task_obj.config.num_fewshot = args.num_fewshot
-            # Also try setting it directly just in case or for older versions
-            task_obj.num_fewshot = args.num_fewshot
-            if hasattr(task_obj, 'set_num_fewshot'):
-                 task_obj.set_num_fewshot(args.num_fewshot)
+            if isinstance(task_obj, dict):
+                # If it's a dictionary (maybe config dict), set the key directly
+                task_obj['num_fewshot'] = args.num_fewshot
+                if 'config' in task_obj and isinstance(task_obj['config'], dict):
+                    task_obj['config']['num_fewshot'] = args.num_fewshot
+            else:
+                # Assume it's an object
+                if hasattr(task_obj, 'config') and hasattr(task_obj.config, 'num_fewshot'):
+                     # lm-eval 0.4+
+                    task_obj.config.num_fewshot = args.num_fewshot
+                
+                # Try setting attribute directly
+                try:
+                    task_obj.num_fewshot = args.num_fewshot
+                except AttributeError:
+                    pass
+                
+                if hasattr(task_obj, 'set_num_fewshot'):
+                     task_obj.set_num_fewshot(args.num_fewshot)
 
     results = evaluator.evaluate(
         lm=adaptor,
