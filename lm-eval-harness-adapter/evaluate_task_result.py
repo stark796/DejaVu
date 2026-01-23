@@ -61,6 +61,52 @@ if __name__ == "__main__":
         def eval(self, batch):
             from tasks.eval_harness import tokenizer
 
+            # Detect request type
+            request_type = "language-model-inference"
+            if "request_type" in batch:
+                if isinstance(batch["request_type"], list):
+                     request_type = batch["request_type"][0]
+                else:
+                     request_type = batch["request_type"]
+
+            if request_type == "generate_until":
+                outputs = []
+                for i, text in enumerate(batch["text"]):
+                     # Reconstruct key to match generation file
+                     # Note: generate_task_data uses "language-model-inference" as the stored request type even for generation
+                     gen_kwargs = batch["gen_kwargs"][i]
+                     max_tokens = gen_kwargs.get("max_gen_toks", gen_kwargs.get("max_new_tokens", 64))
+                     stop = gen_kwargs.get("until", None)
+                     
+                     request = {
+                        "best_of": 1,
+                        "echo": False,
+                        "logprobs": 1,
+                        "max_tokens": max_tokens,
+                        "model": "x",
+                        "n": 1,
+                        "prompt": text,
+                        "request_type": "language-model-inference", # CAUTION: Must match generate_task_data
+                        "stop": stop,
+                        "temperature": gen_kwargs.get("temperature", 0),
+                        "top_p": gen_kwargs.get("top_p", 1),
+                     }
+                     key = json_to_key(request)
+                     
+                     if key in self.results:
+                          res = self.results[key]
+                          # result is [text]
+                          if isinstance(res, list):
+                              outputs.append(res[0])
+                          else:
+                              outputs.append(res) # Should be list though
+                     else:
+                          if args.debug:
+                               print(f"MISSING KEY: {key}")
+                          outputs.append("") # Dummy
+                return outputs
+
+            # Loglikelihood logic
             mask_loss = []
             each_correct = []
 
