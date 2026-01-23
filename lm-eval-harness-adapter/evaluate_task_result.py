@@ -151,7 +151,6 @@ if __name__ == "__main__":
             [args.task_name],
             task_manager=task_manager
         ),
-        num_fewshot=args.num_fewshot,
         limit=args.num_data,
     )
 
