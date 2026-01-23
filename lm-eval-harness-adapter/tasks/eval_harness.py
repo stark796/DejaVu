@@ -133,14 +133,22 @@ class EvalHarnessAdaptor(LM):
             batch_dict = {k: [d[k] for d in batch] for k in batch[0]}
             
             # Call DryRunner
-            self.tpu.eval(batch_dict)
+            batch_outputs = self.tpu.eval(batch_dict)
             
-            # For each item, we need to return a response validation expectation?
-            # actually generate_until expects the generated text as output string.
-            # But we are just generating data.
-            # We return dummy responses.
-            for _ in batch:
-                outputs.append("dummy response")
+            # If tpu.eval returns a list (RealRunner for generation), extend outputs
+            # If tpu.eval returns dict (DryRunner), we might need to handle it?
+            # DryRunner for generation needs to return something? 
+            # In generate_task_data, DryRunner.eval returns validation dict.
+            # But for generation, we probably want it to return dummy strings if we are generating data?
+            
+            if isinstance(batch_outputs, list):
+                outputs.extend(batch_outputs)
+            elif isinstance(batch_outputs, dict) and "generated_text" in batch_outputs:
+                 outputs.extend(batch_outputs["generated_text"])
+            else:
+                 # Fallback for DryRunner during data generation
+                 for _ in batch:
+                    outputs.append("dummy response")
                 
         return outputs
 

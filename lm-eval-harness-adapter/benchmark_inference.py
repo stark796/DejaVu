@@ -129,6 +129,69 @@ def run_inference(prompt, tokenizer, embeddings, layers, lm_head, config, device
     }
 
 
+
+def run_generation(prompt, max_tokens, stop, tokenizer, embeddings, layers, lm_head, config, device):
+    """Run greedy generation on a single prompt."""
+    
+    input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+    generated_ids = input_ids.clone()
+    
+    # Cache for efficient generation (if layers supported it, but here we might recompute or need to handle layer_past carefully)
+    # The existing run_inference uses a specific layer_past pattern.
+    # To be safe and simple (for short generation), we can recompute.
+    
+    with torch.no_grad():
+        for _ in range(max_tokens):
+            # Forward pass
+            hidden_states = embeddings(generated_ids)
+            layer_past = None
+            previous_emb = None
+            for i in range(config.num_hidden_layers):
+                layer = layers[f"block{i}"]
+                if hasattr(layer, 'forward') and 'previous_emb' in layer.forward.__code__.co_varnames:
+                    hidden_states, layer_past = layer(hidden_states, layer_past=layer_past, previous_emb=previous_emb)
+                else:
+                    hidden_states, layer_past = layer(hidden_states, layer_past=layer_past)
+                previous_emb = hidden_states
+            
+            logits = lm_head(hidden_states)
+            next_token_logits = logits[:, -1, :]
+            next_token = torch.argmax(next_token_logits, dim=-1).unsqueeze(-1)
+            
+            generated_ids = torch.cat([generated_ids, next_token], dim=-1)
+            
+            # Check stop conditions
+            # 1. EOS token
+            if next_token.item() == tokenizer.eos_token_id:
+                break
+            
+            # 2. Stop sequences (if any)
+            if stop:
+                decoded_text = tokenizer.decode(generated_ids[0][input_ids.shape[1]:])
+                if isinstance(stop, str):
+                    if stop in decoded_text:
+                        break
+                elif isinstance(stop, list):
+                    if any(s in decoded_text for s in stop):
+                        break
+
+    # Decode only the new tokens
+    new_tokens = generated_ids[0][input_ids.shape[1]:]
+    generated_text = tokenizer.decode(new_tokens, skip_special_tokens=True)
+    
+    # Trim stop sequence if present
+    if stop:
+        if isinstance(stop, str):
+            if stop in generated_text:
+                generated_text = generated_text.split(stop)[0]
+        elif isinstance(stop, list):
+             for s in stop:
+                 if s in generated_text:
+                     generated_text = generated_text.split(s)[0]
+                     
+    return generated_text
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-file", type=str, required=True, help="Input JSONL from generate_task_data.py")
@@ -165,17 +228,27 @@ def main():
     with open(args.output_file, "w") as f:
         for item in tqdm(prompts):
             prompt = item["prompt"]
+            max_tokens = item.get("max_tokens", 0)
             
-            logprobs = run_inference(prompt, tokenizer, embeddings, layers, lm_head, config, args.device)
-            
-            result = {
-                "request": item,
-                "result": {
-                    "choices": [{
-                        "logprobs": logprobs
-                    }]
+            if max_tokens > 0:
+                # Generation request
+                stop = item.get("stop", None)
+                generated_text = run_generation(prompt, max_tokens, stop, tokenizer, embeddings, layers, lm_head, config, args.device)
+                result = {
+                    "request": item,
+                    "result": [generated_text] # lm-eval expects list of strings for generate_until
                 }
-            }
+            else:
+                # Loglikelihood request
+                logprobs = run_inference(prompt, tokenizer, embeddings, layers, lm_head, config, args.device)
+                result = {
+                    "request": item,
+                    "result": {
+                        "choices": [{
+                            "logprobs": logprobs
+                        }]
+                    }
+                }
             
             f.write(json.dumps(result) + "\n")
     
