@@ -20,6 +20,8 @@ def process_init():
     global tokenizer
     model_name = os.environ.get("MODEL_NAME", "facebook/opt-1.3b")
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
     tokenizer.add_bos_token = False
 
 
