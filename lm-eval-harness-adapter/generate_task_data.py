@@ -59,8 +59,9 @@ if __name__ == "__main__":
     from lm_eval.tasks import TaskManager
     task_manager = TaskManager()
     
+    task_names = args.task_name.split(",")
     task_dict = tasks.get_task_dict(
-        [args.task_name],
+        task_names,
         task_manager=task_manager
     )
 
