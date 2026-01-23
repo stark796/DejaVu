@@ -141,25 +141,15 @@ if __name__ == "__main__":
 
     adaptor = EvalHarnessAdaptor(t, seq, total_batch, shrink=pe != "fixed")
 
+    # For newer lm-eval, we need to use a TaskManager
+    from lm_eval.tasks import TaskManager
+    task_manager = TaskManager()
+
     results = evaluator.evaluate(
         adaptor,
         tasks.get_task_dict(
-            [
-                args.task_name
-                # "lambada_openai",
-                # "piqa",
-                # "hellaswag",
-                # "winogrande",
-                # "mathqa",
-                # "pubmedqa",
-                # "boolq",
-                # "cb",
-                # "copa",
-                # "multirc",
-                # "record",
-                # "wic",
-                # "wsc",
-            ]
+            [args.task_name],
+            task_manager=task_manager
         ),
         False,
         args.num_fewshot,
