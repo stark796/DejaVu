@@ -75,13 +75,74 @@ def process_request(x, seq):
     }
 
 
+
+def process_request_gen(x, seq):
+    global tokenizer
+    
+    # Handle Instance objects from newer lm-eval
+    if hasattr(x, "args"):
+        ctx, gen_kwargs = x.args
+    else:
+        ctx, gen_kwargs = x
+
+    ctx_text = ftfy.fix_text(ctx, normalization="NFKC")
+    ctx_tokens = tokenizer(ctx_text, add_special_tokens=False)["input_ids"]
+    
+    # For generation, we don't know the full length yet, but we truncate context if needed
+    # Usually we leave some room for generation.
+    # The benchmark_inference script handles generation, so here we just prepare the prompt.
+    
+    return {
+        "prompt": ctx_text,
+        "gen_kwargs": gen_kwargs,
+        "text": ctx_text, # For consistency
+        "request_type": "generate_until"
+    }
+
+
 class EvalHarnessAdaptor(LM):
     def greedy_until(self, requests):
         raise Exception("unimplemented")
 
     def generate_until(self, requests):
-        """Required abstract method for newer lm-eval versions"""
-        raise Exception("unimplemented")
+        """Supported method for newer lm-eval versions (GPQA etc)"""
+        # Convert requests
+        # We cannot easily parallelize with map/imap if using different seq? 
+        # Actually generate_until requests are simpler.
+        
+        # Note: requests is a list of Instances or tuples (ctx, gen_kwargs)
+        res = []
+        for req in requests:
+           res.append(process_request_gen(req, self.seq))
+           
+        # We pass the list to DryRunner's eval (or generate)
+        # Assuming tpu.eval can handle it or we update it.
+        # DryRunner expects a "batch", so we wrap it.
+        
+        # Just process them individually or in batch?
+        # modify sample_batch to handle this?
+        
+        # To match existing flow, we pass to self.tpu.eval
+        # But DryRunner eval writes to file.
+        
+        # Let's chunk it by self.batch
+        outputs = []
+        for i in range(0, len(res), self.batch):
+            batch = res[i : i + self.batch]
+            # Convert list of dicts to dict of lists
+            batch_dict = {k: [d[k] for d in batch] for k in batch[0]}
+            
+            # Call DryRunner
+            self.tpu.eval(batch_dict)
+            
+            # For each item, we need to return a response validation expectation?
+            # actually generate_until expects the generated text as output string.
+            # But we are just generating data.
+            # We return dummy responses.
+            for _ in batch:
+                outputs.append("dummy response")
+                
+        return outputs
 
     def loglikelihood_rolling(self, requests):
         raise Exception("unimplemented")
@@ -120,3 +181,4 @@ class EvalHarnessAdaptor(LM):
                 output.append((float(-loss), bool(correct)))
 
         return output
+

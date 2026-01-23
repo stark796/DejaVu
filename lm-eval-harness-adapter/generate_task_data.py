@@ -28,20 +28,45 @@ if __name__ == "__main__":
     class DryRunner:
         def eval(self, batch):
             with open(args.output_file, "a") as f:
-                for text in batch["text"]:
-                    item = {
-                        "best_of": 1,
-                        "echo": True,
-                        "logprobs": 1,
-                        "max_tokens": 0,
-                        "model": "x",
-                        "n": 1,
-                        "prompt": text,
-                        "request_type": "language-model-inference",
-                        "stop": None,
-                        "temperature": 0,
-                        "top_p": 1,
-                    }
+                for i, text in enumerate(batch["text"]):
+                    # Handle different request types
+                    req_type = batch.get("request_type", ["language-model-inference"] * len(batch["text"]))[i]
+                    
+                    if req_type == "generate_until":
+                        gen_kwargs = batch["gen_kwargs"][i]
+                        max_tokens = gen_kwargs.get("max_gen_toks", gen_kwargs.get("max_new_tokens", 64))
+                        stop = gen_kwargs.get("until", None)
+                        
+                        item = {
+                            "best_of": 1,
+                            "echo": False,
+                            "logprobs": 1,
+                            "max_tokens": max_tokens,
+                            "model": "x",
+                            "n": 1,
+                            "prompt": text,
+                            "request_type": "language-model-inference", # Can assume same type for backend or differentiate? 
+                            # Usually backend just takes prompt and generation params.
+                            # But wait, original code hardcoded "language-model-inference".
+                            "stop": stop,
+                            "temperature": gen_kwargs.get("temperature", 0),
+                            "top_p": gen_kwargs.get("top_p", 1),
+                        }
+                    else:
+                        # Loglikelihood default
+                        item = {
+                            "best_of": 1,
+                            "echo": True,
+                            "logprobs": 1,
+                            "max_tokens": 0,
+                            "model": "x",
+                            "n": 1,
+                            "prompt": text,
+                            "request_type": "language-model-inference",
+                            "stop": None,
+                            "temperature": 0,
+                            "top_p": 1,
+                        }
 
                     f.write(json.dumps(item) + "\n")
 
