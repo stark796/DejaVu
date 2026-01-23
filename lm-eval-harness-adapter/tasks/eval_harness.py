@@ -71,6 +71,10 @@ class EvalHarnessAdaptor(LM):
     def greedy_until(self, requests):
         raise Exception("unimplemented")
 
+    def generate_until(self, requests):
+        """Required abstract method for newer lm-eval versions"""
+        raise Exception("unimplemented")
+
     def loglikelihood_rolling(self, requests):
         raise Exception("unimplemented")
 
