@@ -229,8 +229,9 @@ def main():
         for item in tqdm(prompts):
             prompt = item["prompt"]
             max_tokens = item.get("max_tokens", 0)
+            request_type = item.get("request_type", "language-model-inference")
             
-            if max_tokens > 0:
+            if request_type == "generate_until":
                 # Generation request
                 stop = item.get("stop", None)
                 generated_text = run_generation(prompt, max_tokens, stop, tokenizer, embeddings, layers, lm_head, config, args.device)

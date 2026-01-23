@@ -45,9 +45,7 @@ if __name__ == "__main__":
                             "model": "x",
                             "n": 1,
                             "prompt": text,
-                            "request_type": "language-model-inference", # Can assume same type for backend or differentiate? 
-                            # Usually backend just takes prompt and generation params.
-                            # But wait, original code hardcoded "language-model-inference".
+                            "request_type": "generate_until", 
                             "stop": stop,
                             "temperature": gen_kwargs.get("temperature", 0),
                             "top_p": gen_kwargs.get("top_p", 1),
