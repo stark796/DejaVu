@@ -42,7 +42,7 @@ def load_model(model_path, model_type, device, config_name=None):
         config = LlamaConfig.from_pretrained(model_path)
     
     if model_type == "llama-sparse":
-        from modules.hf_llama_module_sparse import LlamaEmbeddings, LlamaSparseBlock, GPTLMHead
+        from modules.hf_llama_module_sparse import LlamaEmbeddings, LlamaSparseBlock, LlamaLMHead
         num_layers = config.num_hidden_layers
         
         # Load embeddings
@@ -57,10 +57,10 @@ def load_model(model_path, model_type, device, config_name=None):
             ).to(device).half()
         
         # Load LM head
-        lm_head = GPTLMHead.from_pretrained(model_path, config=config).to(device).half()
+        lm_head = LlamaLMHead.from_pretrained(model_path, config=config).to(device).half()
         
     else:  # Dense
-        from modules.hf_llama_module import LlamaEmbeddings, LlamaBlock, GPTLMHead
+        from modules.hf_llama_module import LlamaEmbeddings, LlamaBlock, LlamaLMHead
         num_layers = config.num_hidden_layers
         
         # Load embeddings
