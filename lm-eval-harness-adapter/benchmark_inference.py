@@ -24,11 +24,22 @@ from transformers import AutoTokenizer
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'Decentralized_FM_alpha'))
 
 
-def load_model(model_path, model_type, device):
-    """Load the DejaVu model (dense or sparse)."""
+def load_model(model_path, model_type, device, config_name=None):
+    """Load the DejaVu model (dense or sparse).
+    
+    Args:
+        model_path: Local path to DejaVu checkpoint
+        model_type: 'llama' or 'llama-sparse'
+        device: torch device
+        config_name: HuggingFace model name for config (e.g., 'meta-llama/Llama-3.2-3B')
+    """
     from transformers import LlamaConfig
     
-    config = LlamaConfig.from_pretrained(model_path)
+    # Load config from HuggingFace if config_name provided, else try local
+    if config_name:
+        config = LlamaConfig.from_pretrained(config_name)
+    else:
+        config = LlamaConfig.from_pretrained(model_path)
     
     if model_type == "llama-sparse":
         from modules.hf_llama_module_sparse import GPTEmbeddings, LlamaSparseBlock, GPTLMHead
@@ -135,8 +146,10 @@ def main():
     print(f"Loading tokenizer from {args.tokenizer_name}")
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
     
-    # Load model
-    embeddings, layers, lm_head, config = load_model(args.model_path, args.model_type, args.device)
+    # Load model (use tokenizer_name for config since local path doesn't have config.json)
+    embeddings, layers, lm_head, config = load_model(
+        args.model_path, args.model_type, args.device, config_name=args.tokenizer_name
+    )
     
     # Read input prompts
     prompts = []
