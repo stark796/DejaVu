@@ -1,24 +1,4 @@
-"""
-Sparse Predictor Training for Llama 3.2 3B - Attention Heads
 
-This script trains the attention head sparse predictor for Llama 3.2 3B.
-
-KEY DIFFERENCES FROM OPT:
-1. Llama uses GQA (Grouped Query Attention) with 24 query heads and 8 KV heads
-2. Llama uses RoPE which causes embedding drift across layers
-3. We expect WORSE prediction accuracy due to embedding drift
-
-IMPORTANT FOR DEJAVU HYPOTHESIS:
-- If predictor accuracy is significantly lower than OPT, it proves the hypothesis
-- OPT: embeddings stable layer-to-layer → good prediction
-- Llama: embeddings change significantly → poor prediction
-
-Usage:
-    python main_att_llama.py --model llama-3b --dataset c4 --L 0
-    
-    For all layers:
-    ./run_c4_att_llama.sh
-"""
 
 import torch
 import numpy as np

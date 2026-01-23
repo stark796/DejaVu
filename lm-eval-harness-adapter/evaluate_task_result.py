@@ -155,4 +155,13 @@ if __name__ == "__main__":
     )
 
     dumped = json.dumps(results, indent=2)
-    print(dumped)
+    print(json.dumps(results, indent=2))
+    
+    print("\n" + "="*40)
+    print("EVALUATION SUMMARY")
+    print("="*40)
+    if "results" in results:
+        print(json.dumps(results["results"], indent=2))
+    else:
+        print("No 'results' key found in output.")
+    print("="*40)
