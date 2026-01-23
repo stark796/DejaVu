@@ -81,10 +81,50 @@ def get_data(args, layer_idx):
     """Load training data for a specific layer."""
     config = CONFIG[args.model]
     
+
     if config['ckt_storage'] == "bylayer":
         # Load MLP input (query)
-        path = f"{DATA[args.model][args.dataset]}/mlp_x_{layer_idx}.mmap"
-        print(f"Reading query from {path}")
+        # Lookahead: For layer N predictor, use layer N-1 output as input
+        # For layer 0, we rely on the embedding output (layer -1 effectively)
+        # but in our data, mlp_x_0 is the input to layer 0, which is fine.
+        # So we use input from previous layer idx
+        # logic: input to predictor of layer k is output of layer k-1
+        # in the recorded data, mlp_x_k is input to layer k.
+        # So we want mlp_x_{k} for layer k?
+        # WAIT. In DejaVu, we predict layer k sparsity using layer k-1 output.
+        # mlp_x_k IS the input to layer k (which is roughly output of layern k-1 + attn k-1).
+        # So using mlp_x_k seems correct for "current layer input"?
+        #
+        # Re-reading paper/logic:
+        # "We predict layer l's sparsity using layer l-1's activation."
+        # mlp_x_l is the INPUT to layer l.
+        # So mlp_x_l IS the output of the previous block (residual stream).
+        # So if we want to predict layer l sparsity, we have mlp_x_l available.
+        #
+        # HOWEVER, the User's "Previous Session Summary" EXPLICITLY stated:
+        # "Fix lookahead training: use layer N-1 input to predict layer N MLP"
+        # "Input (query) for Layer layer_idx is now loaded from mlp_x_{max(0, layer_idx - 1)}.mmap"
+        #
+        # Let's trust the User's explicit prior instruction/summary about "Lookahead".
+        # If I am at layer L, I want to compute sparsity for layer L.
+        # If I use `mlp_x_{L-1}`, I am using the input to layer L-1.
+        # This means I am predicting Layer L sparsity using Layer L-2 output???
+        #
+        # Let's finding the logic.
+        # To pipeline, we need to predict Layer L *before* we compute Layer L-1?
+        # Or in parallel?
+        # DejaVu uses asynchronous lookahead.
+        # It predicts Layer L+1 while Layer L is computing?
+        # If so, predicting Layer L needs input available BEFORE Layer L input is ready?
+        # i.e. using Layer L-1 input?
+        # Yes, using Input(L-1) to predict Sparsity(L).
+        #
+        # So: To train predictor for Layer L (Label L):
+        # Input should be mlp_x_{L-1}.
+        
+        query_idx = max(0, layer_idx - 1)
+        path = f"{DATA[args.model][args.dataset]}/mlp_x_{query_idx}.mmap"
+        print(f"Reading query from {path} (Lookahead: using input from layer {query_idx} to predict layer {layer_idx})")
         query = np.array(np.memmap(
             path, dtype='float16', mode='r',
             shape=(config['N'], config['d'])
