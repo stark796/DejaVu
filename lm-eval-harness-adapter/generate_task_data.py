@@ -60,7 +60,7 @@ if __name__ == "__main__":
     task_manager = TaskManager()
     
     results = evaluator.evaluate(
-        model=adaptor,
+        lm=adaptor,
         task_dict=tasks.get_task_dict(
             [args.task_name],
             task_manager=task_manager
