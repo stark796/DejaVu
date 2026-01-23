@@ -33,7 +33,11 @@ def process_init():
 def process_request(x, seq):
     global tokenizer
 
-    ctx, cont = x
+    # Handle Instance objects from newer lm-eval
+    if hasattr(x, "args"):
+        ctx, cont = x.args
+    else:
+        ctx, cont = x
 
     #     ctx_tokens = tokenizer.encode("<|endoftext|>" + ftfy.fix_text(ctx, normalization="NFKC"))
     ctx_text = ftfy.fix_text(ctx, normalization="NFKC")
