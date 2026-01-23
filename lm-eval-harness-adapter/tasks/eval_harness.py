@@ -55,12 +55,14 @@ def process_request(x, seq):
     provided_ctx = len(all_tokens) - 1
     pad_amount = seq - provided_ctx
 
+    pad_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else (tokenizer.eos_token_id if tokenizer.eos_token_id is not None else 0)
+
     return {
         "obs": np.pad(
-            all_tokens[:-1], ((0, pad_amount),), constant_values=tokenizer.pad_token_id
+            all_tokens[:-1], ((0, pad_amount),), constant_values=pad_id
         ),
         "target": np.pad(
-            all_tokens[1:], ((0, pad_amount),), constant_values=tokenizer.pad_token_id
+            all_tokens[1:], ((0, pad_amount),), constant_values=pad_id
         ),
         "ctx_length": seq,
         "eval_mask": np.logical_and(
