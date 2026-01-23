@@ -74,7 +74,7 @@ def load_model(model_path, model_type, device, config_name=None):
             ).to(device).half()
         
         # Load LM head
-        lm_head = GPTLMHead.from_pretrained(model_path, config=config).to(device).half()
+        lm_head = LlamaLMHead.from_pretrained(model_path, config=config).to(device).half()
     
     return embeddings, layers, lm_head, config
 
