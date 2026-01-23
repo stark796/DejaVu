@@ -45,7 +45,7 @@ fi
 
 # Model configuration
 export MODEL_NAME="meta-llama/Llama-3.2-3B"
-export MODEL_PATH="../checkpoint/llama-3b"
+export MODEL_PATH="../Decentralized_FM_alpha/pretrained_models/llama-3.2-3b"
 
 # Sparsity configuration
 if [ "$SPARSE_MODE" = true ]; then
