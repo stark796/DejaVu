@@ -278,7 +278,7 @@ class LlamaSparseBlock(nn.Module):
         return self._mask
 
     @classmethod
-    def from_pretrained(cls, model_path, config=None, layer_index=None):
+    def from_pretrained(cls, model_path, config=None, layer_index=None, sparse_path=None):
         """Load pretrained layer with sparse predictors."""
         assert layer_index is not None
         if config is None:
@@ -298,6 +298,7 @@ class LlamaSparseBlock(nn.Module):
                     new_state_dict[new_k] = v
                 else:
                     new_state_dict[k] = v
+
             module.load_state_dict(new_state_dict, strict=False)
         except Exception as e:
             print(f"Cannot load layer {layer_index}. Error: {e}")
@@ -306,7 +307,10 @@ class LlamaSparseBlock(nn.Module):
         module.self_attn.layer_idx = layer_index
         
         # Load MLP predictor
-        predictor_path = os.environ.get("SPARSE_PATH", "./checkpoint/llama-3b-sparse-predictor")
+        if sparse_path is None:
+            predictor_path = os.environ.get("SPARSE_PATH", "./checkpoint/llama-3b-sparse-predictor")
+        else:
+            predictor_path = sparse_path
         mlp_topk = int(os.environ.get("MLP_TOPK", "1000"))
         
         module.predictor = nn.Sequential(
