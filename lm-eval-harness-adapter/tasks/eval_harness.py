@@ -2,7 +2,10 @@ from functools import partial
 
 import os
 import transformers
-from lm_eval.base import LM
+try:
+    from lm_eval.api.model import LM  # lm-eval >= 0.4.0
+except ImportError:
+    from lm_eval.base import LM  # lm-eval < 0.4.0
 from tqdm import tqdm
 import numpy as np
 

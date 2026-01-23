@@ -123,14 +123,17 @@ def main():
     parser.add_argument("--input-file", type=str, required=True, help="Input JSONL from generate_task_data.py")
     parser.add_argument("--output-file", type=str, required=True, help="Output JSONL for evaluate_task_result.py")
     parser.add_argument("--model-path", type=str, default="../checkpoint/llama-3b")
+    parser.add_argument("--tokenizer-name", type=str, default="meta-llama/Llama-3.2-3B", 
+                        help="HuggingFace model name for tokenizer (default: meta-llama/Llama-3.2-3B)")
     parser.add_argument("--model-type", type=str, default="llama", choices=["llama", "llama-sparse"])
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
     
     print(f"Loading model from {args.model_path} (type: {args.model_type})")
     
-    # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+    # Load tokenizer from HuggingFace (not local path)
+    print(f"Loading tokenizer from {args.tokenizer_name}")
+    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
     
     # Load model
     embeddings, layers, lm_head, config = load_model(args.model_path, args.model_type, args.device)

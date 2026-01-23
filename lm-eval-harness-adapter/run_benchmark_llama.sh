@@ -64,6 +64,7 @@ python benchmark_inference.py \
     --input-file "$INPUT_FILE" \
     --output-file "$OUTPUT_FILE" \
     --model-path "$MODEL_PATH" \
+    --tokenizer-name "$MODEL_NAME" \
     --model-type "$MODEL_TYPE"
 
 echo "Inference complete. Results saved to $OUTPUT_FILE"
