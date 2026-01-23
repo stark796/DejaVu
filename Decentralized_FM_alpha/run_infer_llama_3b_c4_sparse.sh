@@ -38,7 +38,7 @@ model_path=./pretrained_models/llama-3.2-3b
 export SPARSE_PATH=../checkpoint/llama-3b-sparse-predictor
 # Sparsity Config
 # MLP_TOPK: 4096 / 8192 = 50% active (50% Sparse)
-export MLP_TOPK=4096
+export MLP_TOPK=8192
 export ATT_TOPK=1.0            # 100% active heads (Dense Attention)            # Fraction of active attention heads
 
 # Create directories if needed
