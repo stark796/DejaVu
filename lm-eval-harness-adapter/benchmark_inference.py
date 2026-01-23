@@ -222,10 +222,23 @@ def main():
                 item = json.loads(line)
                 prompts.append(item)
     
+    # Check for existing results to resume
+    start_idx = 0
+    if os.path.exists(args.output_file):
+        with open(args.output_file, "r") as f:
+            for line in f:
+                if line.strip():
+                    start_idx += 1
+        if start_idx > 0:
+            print(f"Found {start_idx} existing results in {args.output_file}. Resuming from index {start_idx}...")
+    
+    prompts = prompts[start_idx:]
     print(f"Processing {len(prompts)} prompts...")
     
     # Run inference and write results
-    with open(args.output_file, "w") as f:
+    # Append mode if resuming
+    mode = "a" if start_idx > 0 else "w"
+    with open(args.output_file, mode) as f:
         for item in tqdm(prompts):
             prompt = item["prompt"]
             max_tokens = item.get("max_tokens", 0)
