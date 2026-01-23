@@ -7,7 +7,7 @@ from tasks import EvalHarnessAdaptor
 
 
 def json_to_key(obj):
-    return json.dumps(obj)
+    return json.dumps(obj, sort_keys=True)
 
 
 if __name__ == "__main__":
