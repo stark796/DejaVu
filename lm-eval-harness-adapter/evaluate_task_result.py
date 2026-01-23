@@ -29,8 +29,10 @@ if __name__ == "__main__":
         os.environ["MODEL_NAME"] = "facebook/opt-66b"
     elif args.model_type == "bloom":
         os.environ["MODEL_NAME"] = "bigscience/bloom"
+    elif args.model_type == "llama":
+        os.environ["MODEL_NAME"] = "meta-llama/Llama-3.2-3B"
     else:
-        assert False
+        raise ValueError(f"Unsupported model type: {args.model_type}")
 
     seq = 1024
     total_batch = 1
