@@ -239,9 +239,25 @@ class LlamaAttention(nn.Module):
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-2]
 
+        # DEBUG: Check position_ids
+        if self.layer_idx == 0:
+            print(f"DEBUG attn: position_ids = {position_ids}")
+            print(f"DEBUG attn: query_states has nan = {torch.isnan(query_states).any()}")
+        
         # Apply rotary position embeddings
         cos, sin = self.rotary_emb(value_states, position_ids)
+        
+        # DEBUG: Check RoPE output
+        if self.layer_idx == 0:
+            print(f"DEBUG attn: cos has nan = {torch.isnan(cos).any()}, inf = {torch.isinf(cos).any()}")
+            print(f"DEBUG attn: sin has nan = {torch.isnan(sin).any()}, inf = {torch.isinf(sin).any()}")
+        
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
+        
+        # DEBUG: Check after RoPE
+        if self.layer_idx == 0:
+            print(f"DEBUG attn: after RoPE, Q has nan = {torch.isnan(query_states).any()}")
+            print(f"DEBUG attn: after RoPE, K has nan = {torch.isnan(key_states).any()}")
 
         # Handle KV cache
         if past_key_value is not None:
@@ -256,9 +272,19 @@ class LlamaAttention(nn.Module):
 
         # Compute attention
         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+        
+        # DEBUG: Check attention weights before mask
+        if self.layer_idx == 0:
+            print(f"DEBUG attn: attn_weights (before mask) has nan = {torch.isnan(attn_weights).any()}, max = {attn_weights.max():.4f}, min = {attn_weights.min():.4f}")
+            if attention_mask is not None:
+                print(f"DEBUG attn: attention_mask has nan = {torch.isnan(attention_mask).any()}, max = {attention_mask.max():.4f}, min = {attention_mask.min():.4f}")
 
         if attention_mask is not None:
             attn_weights = attn_weights + attention_mask
+
+        # DEBUG: Check after mask
+        if self.layer_idx == 0:
+            print(f"DEBUG attn: attn_weights (after mask) has nan = {torch.isnan(attn_weights).any()}")
 
         # Softmax
         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
