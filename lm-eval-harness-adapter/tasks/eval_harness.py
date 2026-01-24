@@ -44,6 +44,10 @@ def process_request(x, seq):
     #     ctx_tokens = tokenizer.encode("<|endoftext|>" + ftfy.fix_text(ctx, normalization="NFKC"))
     ctx_text = ftfy.fix_text(ctx, normalization="NFKC")
     cont_text = ftfy.fix_text(cont, normalization="NFKC")
+    
+    if not cont_text.strip():
+        print(f"DEBUG: Empty continuation! Ctx len: {len(ctx_text)}, Cont: '{cont_text}'")
+        print(f"DEBUG: Ctx end: '{ctx_text[-50:]}'")
     all_text = ctx_text + cont_text
 
     ctx_tokens = tokenizer(ctx_text, add_special_tokens=False)["input_ids"]
@@ -170,7 +174,8 @@ class EvalHarnessAdaptor(LM):
         process_init()
 
     def convert_requests(self, requests):
-        return self.pool.imap(partial(process_request, seq=self.seq), requests)
+        # Disable multiprocessing for debugging prints
+        return map(partial(process_request, seq=self.seq), requests)
 
     def loglikelihood(self, requests):
         output = []
