@@ -21,7 +21,7 @@ if __name__ == "__main__":
     parser.add_argument("--task-name", type=str, default="hellaswag")
     parser.add_argument("--model-type", type=str, default="opt")
     parser.add_argument("--debug", action="store_true", default=False)
-    parser.add_argument("--num-fewshot", type=int, default=0)
+    parser.add_argument("--num-fewshot", type=int, default=None, help="Number of few-shot examples")
     parser.add_argument("--num-data", type=int, default=None)
     parser.add_argument("--output-json", type=str, default=None, help="Path to save the evaluation summary JSON")
     args = parser.parse_args()
@@ -200,12 +200,40 @@ if __name__ == "__main__":
     from lm_eval.tasks import TaskManager
     task_manager = TaskManager()
 
+    # Support comma-separated task names
+    task_names = args.task_name.split(",")
+    task_dict = tasks.get_task_dict(
+        task_names,
+        task_manager=task_manager
+    )
+
+    # Function to recursively set fewshot (copied from generate_task_data.py)
+    def set_fewshot(t_obj, n_shots):
+        if isinstance(t_obj, dict):
+            if 'config' in t_obj and isinstance(t_obj['config'], dict):
+                t_obj['config']['num_fewshot'] = n_shots
+            elif 'num_fewshot' in t_obj:
+                 t_obj['num_fewshot'] = n_shots
+            for k, v in t_obj.items():
+                if isinstance(v, (dict, object)) and not isinstance(v, (int, float, str, bool)):
+                    set_fewshot(v, n_shots)
+        else:
+            if hasattr(t_obj, 'config') and hasattr(t_obj.config, 'num_fewshot'):
+                t_obj.config.num_fewshot = n_shots
+            try:
+                t_obj.num_fewshot = n_shots
+            except AttributeError:
+                pass
+            if hasattr(t_obj, 'set_num_fewshot'):
+                t_obj.set_num_fewshot(n_shots)
+
+    if args.num_fewshot is not None:
+        for task_name, task_obj in task_dict.items():
+            set_fewshot(task_obj, args.num_fewshot)
+
     results = evaluator.evaluate(
         lm=adaptor,
-        task_dict=tasks.get_task_dict(
-            [args.task_name],
-            task_manager=task_manager
-        ),
+        task_dict=task_dict,
         limit=args.num_data,
     )
 
