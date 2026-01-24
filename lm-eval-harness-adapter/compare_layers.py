@@ -68,39 +68,47 @@ def main():
             print("  -> Embeddings match ✓")
     
     print("\n" + "="*60)
-    print("COMPARING LAYERS (first 3 and last)")
+    print("COMPARING FINAL LOGITS")
     print("="*60)
     
     with torch.no_grad():
-        hf_h = hf_hidden
-        dv_h = dv_hidden
+        # Get HuggingFace output using full model
+        hf_output = hf_model(input_ids)
+        hf_logits = hf_output.logits
+        
+        # Get DejaVu output using full forward pass
+        dv_hidden = dv_embeddings(input_ids)
         dv_past = None
-        
-        # Compare first 3 layers
-        for layer_idx in [0, 1, 2, hf_config.num_hidden_layers - 1]:
-            # HuggingFace layer forward
-            hf_layer = hf_model.model.layers[layer_idx]
-            hf_out = hf_layer(hf_h, position_ids=torch.arange(input_ids.size(1), device=device).unsqueeze(0))
-            hf_h = hf_out[0]
-            
-            # DejaVu layer forward
+        for layer_idx in range(dv_config.num_hidden_layers):
             dv_layer = dv_layers[f"block{layer_idx}"]
-            dv_h, dv_past = dv_layer(dv_h, layer_past=None)
-            
-            diff = (hf_h - dv_h).abs().max().item()
-            mean_diff = (hf_h - dv_h).abs().mean().item()
-            
-            print(f"Layer {layer_idx}: max_diff={diff:.6f}, mean_diff={mean_diff:.6f}")
-            
-            if diff > 0.1:
-                print(f"  -> LAYER {layer_idx} OUTPUT DIFFERS SIGNIFICANTLY!")
-                print(f"     HF  sample: {hf_h[0, 0, :5].tolist()}")
-                print(f"     DV  sample: {dv_h[0, 0, :5].tolist()}")
-                break
+            dv_hidden, dv_past = dv_layer(dv_hidden, layer_past=None)
+        dv_logits = dv_lm_head(dv_hidden)
         
-    print("\n" + "="*60)
-    print("If a layer shows significant difference, the bug is in that layer's forward pass.")
-    print("="*60)
+        # Compare logits
+        diff = (hf_logits - dv_logits).abs()
+        print(f"Logits max diff: {diff.max().item():.4f}")
+        print(f"Logits mean diff: {diff.mean().item():.4f}")
+        
+        # Compare next token predictions
+        hf_next = hf_logits[0, -1, :].argmax().item()
+        dv_next = dv_logits[0, -1, :].argmax().item()
+        
+        print(f"\nHF  next token: '{tokenizer.decode([hf_next])}' (id={hf_next})")
+        print(f"DV  next token: '{tokenizer.decode([dv_next])}' (id={dv_next})")
+        
+        if hf_next == dv_next:
+            print("  -> Predictions MATCH ✓")
+        else:
+            print("  -> Predictions DIFFER!")
+            # Show top-5 for both
+            hf_top5 = hf_logits[0, -1, :].topk(5)
+            dv_top5 = dv_logits[0, -1, :].topk(5)
+            print("\nHF top-5:")
+            for i in range(5):
+                print(f"  {tokenizer.decode([hf_top5.indices[i].item()])}: {hf_top5.values[i].item():.2f}")
+            print("\nDV top-5:")
+            for i in range(5):
+                print(f"  {tokenizer.decode([dv_top5.indices[i].item()])}: {dv_top5.values[i].item():.2f}")
 
 
 if __name__ == "__main__":
