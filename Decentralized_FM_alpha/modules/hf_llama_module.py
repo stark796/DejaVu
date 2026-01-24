@@ -275,25 +275,13 @@ class LlamaAttention(nn.Module):
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-2]
 
-        # DEBUG: Check position_ids
-        if self.layer_idx == 0:
-            print(f"DEBUG attn: position_ids = {position_ids}")
-            print(f"DEBUG attn: query_states has nan = {torch.isnan(query_states).any()}")
-        
+
         # Apply rotary position embeddings
         cos, sin = self.rotary_emb(value_states, position_ids)
         
-        # DEBUG: Check RoPE output
-        if self.layer_idx == 0:
-            print(f"DEBUG attn: cos has nan = {torch.isnan(cos).any()}, inf = {torch.isinf(cos).any()}")
-            print(f"DEBUG attn: sin has nan = {torch.isnan(sin).any()}, inf = {torch.isinf(sin).any()}")
-        
+
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
         
-        # DEBUG: Check after RoPE
-        if self.layer_idx == 0:
-            print(f"DEBUG attn: after RoPE, Q has nan = {torch.isnan(query_states).any()}")
-            print(f"DEBUG attn: after RoPE, K has nan = {torch.isnan(key_states).any()}")
 
         # Handle KV cache
         if past_key_value is not None:
@@ -309,18 +297,10 @@ class LlamaAttention(nn.Module):
         # Compute attention
         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
         
-        # DEBUG: Check attention weights before mask
-        if self.layer_idx == 0:
-            print(f"DEBUG attn: attn_weights (before mask) has nan = {torch.isnan(attn_weights).any()}, max = {attn_weights.max():.4f}, min = {attn_weights.min():.4f}")
-            if attention_mask is not None:
-                print(f"DEBUG attn: attention_mask has nan = {torch.isnan(attention_mask).any()}, max = {attention_mask.max():.4f}, min = {attention_mask.min():.4f}")
 
         if attention_mask is not None:
             attn_weights = attn_weights + attention_mask
 
-        # DEBUG: Check after mask
-        if self.layer_idx == 0:
-            print(f"DEBUG attn: attn_weights (after mask) has nan = {torch.isnan(attn_weights).any()}")
 
         # Softmax
         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
@@ -416,11 +396,7 @@ class LlamaBlock(nn.Module):
             state_dict_path = os.path.join(model_path, f"pytorch_{layer_index}.pt")
             state_dict = torch.load(state_dict_path, map_location='cpu')
             
-            # Debug: Print keys for first layer
-            if layer_index == 0:
-                print(f"Loading layer {layer_index} state dict keys: {list(state_dict.keys())[:5]}...")
-                print(f"Module expects keys: {list(module.state_dict().keys())[:5]}...")
-            
+
             # Load with strict=False to see what's missing
             missing, unexpected = module.load_state_dict(state_dict, strict=False)
             if missing:
@@ -485,10 +461,7 @@ class LlamaBlock(nn.Module):
         # Pre-norm + Attention
         hidden_states = self.input_layernorm(hidden_states)
         
-        # Debug: Check after layernorm
-        if self.layer_idx == 0 and torch.isnan(hidden_states).any():
-            print(f"WARNING: NaN after input_layernorm in layer {self.layer_idx}")
-        
+
         hidden_states, _, present = self.self_attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
@@ -497,10 +470,7 @@ class LlamaBlock(nn.Module):
             use_cache=True,
         )
         
-        # Debug: Check after attention
-        if self.layer_idx == 0 and torch.isnan(hidden_states).any():
-            print(f"WARNING: NaN after attention in layer {self.layer_idx}")
-        
+
         hidden_states = residual + hidden_states
 
         # Pre-norm + MLP
@@ -508,10 +478,7 @@ class LlamaBlock(nn.Module):
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
         
-        # Debug: Check after MLP
-        if self.layer_idx == 0 and torch.isnan(hidden_states).any():
-            print(f"WARNING: NaN after MLP in layer {self.layer_idx}")
-        
+
         hidden_states = residual + hidden_states
 
         return hidden_states, present
@@ -554,26 +521,7 @@ class LlamaLMHead(nn.Module):
         return module
 
     def forward(self, x, input_ids=None):
-        # Debug: check input
-        if torch.isnan(x).any():
-            print(f"WARNING: NaN in LlamaLMHead input, shape={x.shape}")
-        if torch.isinf(x).any():
-            print(f"WARNING: Inf in LlamaLMHead input, shape={x.shape}")
-        
         x = self.norm(x)
-        
-        # Debug: check after norm
-        if torch.isnan(x).any():
-            print(f"WARNING: NaN after LlamaLMHead norm, shape={x.shape}")
-        if torch.isinf(x).any():
-            print(f"WARNING: Inf after LlamaLMHead norm, shape={x.shape}")
-        
         x = self.lm_head(x)
-        
-        # Debug: check output
-        if torch.isnan(x).any():
-            print(f"WARNING: NaN in LlamaLMHead output (logits), shape={x.shape}")
-        if torch.isinf(x).any():
-            print(f"WARNING: Inf in LlamaLMHead output (logits), shape={x.shape}")
-        
         return x
+

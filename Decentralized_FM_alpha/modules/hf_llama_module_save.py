@@ -305,11 +305,6 @@ class LlamaBlock(nn.Module):
             shape=(num_samples, config.num_attention_heads),
         )
 
-        # CRITICAL FIX: Reinitialize rotary embedding since skip_init doesn't initialize its buffers
-        # The LlamaRotaryEmbedding computes inv_freq in __init__, which is skipped by skip_init
-        from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
-        module.self_attn.rotary_emb = LlamaRotaryEmbedding(config=config)
-
         return module
 
     def forward(
@@ -351,15 +346,6 @@ class LlamaBlock(nn.Module):
             begin, end = self.fp_i, min(self.fp_i + num_tokens, self.fp_att_query.shape[0])
             self.fp_att_query[begin:end] = _hidden[:end-begin].detach().cpu().numpy()
 
-        # Collect MLP input query (Layer Input) for Lookahead Prediction (N=1)
-        # CRITICAL FIX: We collect 'x' (before attention) because inference uses Layer Input to predict MLP
-        if self.fp_mlp_query is not None and self.fp_i < self.fp_mlp_query.shape[0] and seq_len > 1:
-            # Re-use the same flattened _hidden from attention collection if available, or re-view it
-            _hidden = hidden_states.view(-1, hidden_states.size(-1))
-            num_tokens = _hidden.size(0)
-            begin, end = self.fp_i, min(self.fp_i + num_tokens, self.fp_mlp_query.shape[0])
-            self.fp_mlp_query[begin:end] = _hidden[:end-begin].detach().cpu().numpy()
-
         # Attention
         hidden_states = self.input_layernorm(hidden_states)
         hidden_states, _, present = self.self_attn(
@@ -372,8 +358,14 @@ class LlamaBlock(nn.Module):
         )
         hidden_states = residual + hidden_states
 
+        # Collect MLP input query (before RMSNorm)
+        # Only collect during prefill (when seq_len > 1)
         residual = hidden_states
-        # MLP Collection moved to start of block (see above)
+        if self.fp_mlp_query is not None and self.fp_i < self.fp_mlp_query.shape[0] and seq_len > 1:
+            _hidden = hidden_states.view(-1, hidden_states.size(-1))
+            num_tokens = _hidden.size(0)
+            begin, end = self.fp_i, min(self.fp_i + num_tokens, self.fp_mlp_query.shape[0])
+            self.fp_mlp_query[begin:end] = _hidden[:end-begin].detach().cpu().numpy()
 
         # MLP with data collection
         hidden_states = self.post_attention_layernorm(hidden_states)
