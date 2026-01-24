@@ -90,15 +90,12 @@ def run_inference(prompt, tokenizer, embeddings, layers, lm_head, config, device
         hidden_states = embeddings(input_ids)
         
         # Forward through layers
-        layer_past = None
-        previous_emb = None
+        # IMPORTANT: For a fresh forward pass (non-incremental), each layer should get layer_past=None
+        # Passing one layer's KV cache to the next layer would corrupt attention!
         for i in range(config.num_hidden_layers):
             layer = layers[f"block{i}"]
-            if hasattr(layer, 'forward') and 'previous_emb' in layer.forward.__code__.co_varnames:
-                hidden_states, layer_past = layer(hidden_states, layer_past=layer_past, previous_emb=previous_emb)
-            else:
-                hidden_states, layer_past = layer(hidden_states, layer_past=layer_past)
-            previous_emb = hidden_states
+            # Note: We discard the returned 'present' since we're not doing incremental generation
+            hidden_states, _ = layer(hidden_states, layer_past=None)
         
         # LM head
         logits = lm_head(hidden_states)
@@ -142,17 +139,11 @@ def run_generation(prompt, max_tokens, stop, tokenizer, embeddings, layers, lm_h
     
     with torch.no_grad():
         for _ in range(max_tokens):
-            # Forward pass
+            # Forward pass - each layer gets layer_past=None for fresh pass
             hidden_states = embeddings(generated_ids)
-            layer_past = None
-            previous_emb = None
             for i in range(config.num_hidden_layers):
                 layer = layers[f"block{i}"]
-                if hasattr(layer, 'forward') and 'previous_emb' in layer.forward.__code__.co_varnames:
-                    hidden_states, layer_past = layer(hidden_states, layer_past=layer_past, previous_emb=previous_emb)
-                else:
-                    hidden_states, layer_past = layer(hidden_states, layer_past=layer_past)
-                previous_emb = hidden_states
+                hidden_states, _ = layer(hidden_states, layer_past=None)
             
             logits = lm_head(hidden_states)
             next_token_logits = logits[:, -1, :]
