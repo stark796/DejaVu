@@ -48,6 +48,9 @@ def process_request(x, seq):
 
     ctx_tokens = tokenizer(ctx_text, add_special_tokens=False)["input_ids"]
     cont_tokens = tokenizer(cont_text, add_special_tokens=False)["input_ids"]
+    
+    if getattr(tokenizer, "add_bos_token", False) and tokenizer.bos_token_id is not None:
+         ctx_tokens = [tokenizer.bos_token_id] + ctx_tokens
 
     all_tokens = ctx_tokens + cont_tokens
     all_tokens = np.array(all_tokens)[-seq:]  # truncate sequence at seq length

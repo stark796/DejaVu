@@ -168,18 +168,13 @@ if __name__ == "__main__":
                             raise e
 
 
-                    # avg_logprob = sum(token_logprobs[1:]) / (len(token_logprobs) - 1)
-                    if n_positive > 0:
-                        avg_logprob = sum_lobprob / n_positive
-                    else:
-                        print(f"WARNING: n_positive is 0 for request {i}")
-                        print(f"Prop: {batch['prompt'][i]}")
-                        print(f"Target: {batch['target'][i]}")
-                        print(f"Tokens: {tokens}")
-                        print(f"Eval Mask: {eval_mask}")
-                        avg_logprob = -99999.0
-
-                    mask_loss.append(-avg_logprob)
+                    
+                    # Loglikelihood is usually sum of logprobs
+                    logprob = sum_lobprob
+                    
+                    # We negate it because mask_loss name implies loss (positive), but we want to return logprob
+                    # The adapter flips it back.
+                    mask_loss.append(-logprob)
 
                     each_correct.append(correct)
 
