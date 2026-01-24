@@ -151,11 +151,28 @@ if __name__ == "__main__":
                     # Calculate alignment shift
                     # We assume the mismatch is due to tokenization differences (e.g. splits/merges) 
                     # but the content is the same, so we align the END of the sequences.
-                    # process_request length: batch['ctx_length'][i] + 1
-                    # inference length: len(tokens)
-                    proc_len = batch['ctx_length'][i] + 1
+                    # process_request length: batch['ctx_length'][i] + 1 is WRONG (it's buffer size)
+                    # We derive actual length from the mask (assuming mask covers the end).
+                    
+                    try:
+                        # indices where mask is True
+                        true_indices = [idx for idx, m in enumerate(eval_mask) if m]
+                        if true_indices:
+                            last_mask_idx = true_indices[-1]
+                            # last_mask_idx corresponds to all_tokens[last_mask_idx + 1]
+                            # so len(all_tokens) = last_mask_idx + 1 + 1 = last_mask_idx + 2
+                            proc_len = last_mask_idx + 2
+                        else:
+                            # Fallback if mask is empty (should not happen for valid tasks)
+                            proc_len = batch['ctx_length'][i] 
+                    except:
+                        proc_len = len(tokens) # Default to no shift if calculation fails
+
                     inf_len = len(tokens)
                     shift = inf_len - proc_len
+                    
+                    if args.debug and i < 4:
+                         print(f"DEBUG: derived proc_len from mask: {proc_len}, inf_len: {inf_len}, shift: {shift}")
                     
                     for token_idx, mask_val in enumerate(eval_mask):
                         if not mask_val:
