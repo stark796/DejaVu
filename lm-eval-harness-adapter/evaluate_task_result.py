@@ -175,7 +175,15 @@ if __name__ == "__main__":
                         # VERIFY: Print what we are scoring
                         # Only for first few requests to avoid spam
                         if i < 4: 
-                            print(f"DEBUG: Req {i}, Scoring Token: '{tokens[mapped_idx]}', Logprob: {token_logprobs[mapped_idx]}")
+                            print(f"DEBUG: Req {i}")
+                            print(f"  proc_len: {proc_len}, inf_len: {inf_len}, shift: {shift}")
+                            print(f"  token_idx: {token_idx} -> mapped_idx: {mapped_idx}")
+                            print(f"  Scoring Token: '{tokens[mapped_idx]}'")
+                            print(f"  Logprob: {token_logprobs[mapped_idx]}")
+                            try:
+                                print(f"  Tokens[-5:]: {tokens[-5:]}")
+                            except:
+                                pass
 
                         # Only check correctness if we have logprobs
                         try:
