@@ -46,7 +46,7 @@ for L in $(seq 0 $((NUM_LAYERS - 1))); do
         --batch_size 1024 \
         --epochs 20 \
         --lr 0.001 \
-        --k 0.7
+        --k 1.0
     
     # Check if training succeeded
     if [ $? -ne 0 ]; then
