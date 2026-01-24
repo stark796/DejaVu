@@ -172,6 +172,11 @@ if __name__ == "__main__":
                         sum_lobprob += token_logprobs[mapped_idx]
                         n_positive += 1
                         
+                        # VERIFY: Print what we are scoring
+                        # Only for first few requests to avoid spam
+                        if i < 4: 
+                            print(f"DEBUG: Req {i}, Scoring Token: '{tokens[mapped_idx]}', Logprob: {token_logprobs[mapped_idx]}")
+
                         # Only check correctness if we have logprobs
                         try:
                              if top_logprobs and mapped_idx < len(top_logprobs):
@@ -182,26 +187,7 @@ if __name__ == "__main__":
                         except Exception:
                              pass
                     
-                    if n_positive == 0:
-                        print(f"WARNING: n_positive is 0 for request {i}")
-                        try:
-                            prompt_val = batch.get('prompt', ['MISSING'])[i]
-                            target_val = batch.get('target', ['MISSING'])[i]
-                            print(f"Prop: {prompt_val}")
-                            print(f"Target: {target_val}")
-                            print(f"Tokens (last 10): {tokens[-10:]}")
-                            print(f" lengths: proc={proc_len}, inf={inf_len}, shift={shift}")
-                        except Exception as e:
-                            print(f"Error printing debug info: {e}")
-                        
-                        logprob = -99999.0 # Penalty
-                    else:
-                        # Loglikelihood is usually sum of logprobs
-                        logprob = sum_lobprob
-                    
-                    # We negate it because mask_loss name implies loss (positive), but we want to return logprob
-                    # The adapter flips it back.
-                    mask_loss.append(-logprob)
+                    mask_loss.append(-sum_lobprob)
 
                     each_correct.append(correct)
 
