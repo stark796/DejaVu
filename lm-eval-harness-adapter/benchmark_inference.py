@@ -208,6 +208,9 @@ def main():
     # Load tokenizer from HuggingFace (not local path)
     print(f"Loading tokenizer from {args.tokenizer_name}")
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.add_bos_token = True
     
     # Load model (use tokenizer_name for config since local path doesn't have config.json)
     embeddings, layers, lm_head, config = load_model(
