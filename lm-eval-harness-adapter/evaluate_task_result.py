@@ -1,9 +1,16 @@
 import argparse
 import json
 import os
+import random
+import numpy as np
 
 from lm_eval import evaluator, tasks
 from tasks import EvalHarnessAdaptor
+
+# Set fixed random seed for consistent few-shot prompt generation
+# Must match the seed used in generate_task_data.py
+random.seed(42)
+np.random.seed(42)
 
 
 def json_to_key(obj):
