@@ -22,7 +22,7 @@ def process_init():
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.add_bos_token = False
+    tokenizer.add_bos_token = True
 
 
 #     tokenizer = transformers.GPT2TokenizerFast.from_pretrained('gpt2')
