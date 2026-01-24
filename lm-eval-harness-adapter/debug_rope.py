@@ -24,92 +24,117 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
     input_ids = tokenizer.encode("The capital of France is", return_tensors="pt").to(device)
     
-    # Load HF model
-    print("\nLoading HuggingFace model...")
-    hf_model = LlamaForCausalLM.from_pretrained(
-        tokenizer_name, torch_dtype=torch.float16, device_map=device
-    )
-    
     # Load DejaVu layer
     print("Loading DejaVu layer 0...")
     dv_config = LlamaConfig.from_pretrained(tokenizer_name)
     dv_layer0 = LlamaBlock.from_pretrained(model_path, config=dv_config, layer_index=0).to(device).half()
     
     # Get embeddings
+    dv_embeddings = LlamaEmbeddings.from_pretrained(model_path, config=dv_config).to(device).half()
     with torch.no_grad():
-        hf_hidden = hf_model.model.embed_tokens(input_ids)
-        dv_embeddings = LlamaEmbeddings.from_pretrained(model_path, config=dv_config).to(device).half()
         dv_hidden = dv_embeddings(input_ids)
     
     print("\n" + "="*60)
-    print("COMPARING ROPE EMBEDDINGS")
+    print("EXAMINING DV ROTARY_EMB")
     print("="*60)
     
-    hf_layer0 = hf_model.model.layers[0]
+    dv_rotary = dv_layer0.self_attn.rotary_emb
     
-    # Get HF rotary_emb info
-    print(f"\nHF rotary_emb type: {type(hf_layer0.self_attn.rotary_emb)}")
-    print(f"HF rotary_emb device: {next(hf_layer0.self_attn.rotary_emb.parameters(), torch.tensor([0])).device if list(hf_layer0.self_attn.rotary_emb.parameters()) else 'no parameters'}")
-    if hasattr(hf_layer0.self_attn.rotary_emb, 'inv_freq'):
-        print(f"HF inv_freq shape: {hf_layer0.self_attn.rotary_emb.inv_freq.shape if hf_layer0.self_attn.rotary_emb.inv_freq is not None else None}")
-        print(f"HF inv_freq device: {hf_layer0.self_attn.rotary_emb.inv_freq.device if hf_layer0.self_attn.rotary_emb.inv_freq is not None else None}")
-        print(f"HF inv_freq dtype: {hf_layer0.self_attn.rotary_emb.inv_freq.dtype if hf_layer0.self_attn.rotary_emb.inv_freq is not None else None}")
-        print(f"HF inv_freq sample: {hf_layer0.self_attn.rotary_emb.inv_freq[:5] if hf_layer0.self_attn.rotary_emb.inv_freq is not None else None}")
+    print(f"DV rotary_emb type: {type(dv_rotary)}")
+    print(f"DV rotary_emb config: {dv_rotary.config if hasattr(dv_rotary, 'config') else 'N/A'}")
     
-    print(f"\nDV rotary_emb type: {type(dv_layer0.self_attn.rotary_emb)}")
-    if hasattr(dv_layer0.self_attn.rotary_emb, 'inv_freq'):
-        print(f"DV inv_freq shape: {dv_layer0.self_attn.rotary_emb.inv_freq.shape if dv_layer0.self_attn.rotary_emb.inv_freq is not None else None}")
-        print(f"DV inv_freq device: {dv_layer0.self_attn.rotary_emb.inv_freq.device if dv_layer0.self_attn.rotary_emb.inv_freq is not None else None}")
-        print(f"DV inv_freq dtype: {dv_layer0.self_attn.rotary_emb.inv_freq.dtype if dv_layer0.self_attn.rotary_emb.inv_freq is not None else None}")
-        print(f"DV inv_freq sample: {dv_layer0.self_attn.rotary_emb.inv_freq[:5] if dv_layer0.self_attn.rotary_emb.inv_freq is not None else None}")
-    else:
-        print("DV rotary_emb has no inv_freq attribute!")
+    # Check all attributes
+    print(f"\nDV rotary_emb attributes:")
+    for attr in dir(dv_rotary):
+        if not attr.startswith('_'):
+            try:
+                val = getattr(dv_rotary, attr)
+                if isinstance(val, torch.Tensor):
+                    print(f"  {attr}: Tensor shape={val.shape}, device={val.device}, dtype={val.dtype}")
+                    if val.numel() < 20:
+                        print(f"    values: {val}")
+                    else:
+                        print(f"    sample: {val.flatten()[:5]}")
+                    if torch.isnan(val).any():
+                        print(f"    WARNING: Contains NaN!")
+                elif not callable(val):
+                    print(f"  {attr}: {val}")
+            except:
+                pass
     
-    # Check rotary_emb config
-    print(f"\nDV rotary_emb config attributes:")
-    for attr in ['dim', 'max_position_embeddings', 'base', 'rope_type']:
-        if hasattr(dv_layer0.self_attn.rotary_emb, attr):
-            print(f"  {attr}: {getattr(dv_layer0.self_attn.rotary_emb, attr)}")
+    # Check registered buffers
+    print(f"\nDV rotary_emb buffers:")
+    for name, buf in dv_rotary.named_buffers():
+        print(f"  {name}: shape={buf.shape}, device={buf.device}, dtype={buf.dtype}")
+        if torch.isnan(buf).any():
+            print(f"    WARNING: Contains NaN!")
     
-    # Now call rotary_emb manually
+    # Check registered parameters
+    print(f"\nDV rotary_emb parameters:")
+    for name, param in dv_rotary.named_parameters():
+        print(f"  {name}: shape={param.shape}, device={param.device}, dtype={param.dtype}")
+        if torch.isnan(param).any():
+            print(f"    WARNING: Contains NaN!")
+    
     print("\n" + "="*60)
-    print("CALLING ROTARY_EMB MANUALLY")
+    print("CREATING FRESH ROTARY_EMB FOR COMPARISON")
+    print("="*60)
+    
+    # Create a fresh LlamaRotaryEmbedding on CUDA with same config
+    print(f"\nCreating fresh LlamaRotaryEmbedding with config...")
+    print(f"  rope_theta: {dv_config.rope_theta}")
+    print(f"  max_position_embeddings: {dv_config.max_position_embeddings}")
+    print(f"  head_dim: {dv_config.hidden_size // dv_config.num_attention_heads}")
+    
+    fresh_rotary = LlamaRotaryEmbedding(config=dv_config).to(device)
+    
+    print(f"\nFresh rotary_emb buffers after .to(device):")
+    for name, buf in fresh_rotary.named_buffers():
+        print(f"  {name}: shape={buf.shape}, device={buf.device}, dtype={buf.dtype}")
+        if torch.isnan(buf).any():
+            print(f"    WARNING: Contains NaN!")
+    
+    # Now call both and compare
+    print("\n" + "="*60)
+    print("CALLING ROTARY_EMB")
     print("="*60)
     
     with torch.no_grad():
         # Prepare inputs like in attention
-        hf_after_ln1 = hf_layer0.input_layernorm(hf_hidden)
-        v = hf_layer0.self_attn.v_proj(hf_after_ln1)
-        v = v.view(1, 6, hf_layer0.self_attn.num_key_value_heads, hf_layer0.self_attn.head_dim).transpose(1, 2)
+        dv_after_ln1 = dv_layer0.input_layernorm(dv_hidden)
+        dv_v = dv_layer0.self_attn.v_proj(dv_after_ln1)
+        head_dim = dv_layer0.self_attn.head_dim
+        num_kv_heads = dv_layer0.self_attn.num_key_value_heads
+        dv_v = dv_v.view(1, 6, num_kv_heads, head_dim).transpose(1, 2)
         
         position_ids = torch.arange(0, 6, dtype=torch.long, device=device).unsqueeze(0)
         
-        print(f"v shape: {v.shape}, device: {v.device}, dtype: {v.dtype}")
+        print(f"v shape: {dv_v.shape}, device: {dv_v.device}, dtype: {dv_v.dtype}")
         print(f"position_ids: {position_ids}")
         
-        # Call HF rotary_emb
-        print("\nCalling HF rotary_emb...")
-        hf_cos, hf_sin = hf_layer0.self_attn.rotary_emb(v, position_ids)
-        print(f"HF cos has nan: {torch.isnan(hf_cos).any()}, shape: {hf_cos.shape}")
-        print(f"HF sin has nan: {torch.isnan(hf_sin).any()}, shape: {hf_sin.shape}")
-        print(f"HF cos sample: {hf_cos[0, :5, 0]}")
-        
-        # Call DV rotary_emb
-        print("\nCalling DV rotary_emb...")
-        dv_after_ln1 = dv_layer0.input_layernorm(dv_hidden)
-        dv_v = dv_layer0.self_attn.v_proj(dv_after_ln1)
-        dv_v = dv_v.view(1, 6, dv_layer0.self_attn.num_key_value_heads, dv_layer0.self_attn.head_dim).transpose(1, 2)
-        
+        # Call DV rotary_emb (the one from LlamaBlock)
+        print("\nCalling DV layer's rotary_emb...")
         try:
-            dv_cos, dv_sin = dv_layer0.self_attn.rotary_emb(dv_v, position_ids)
-            print(f"DV cos has nan: {torch.isnan(dv_cos).any()}, shape: {dv_cos.shape}")
-            print(f"DV sin has nan: {torch.isnan(dv_sin).any()}, shape: {dv_sin.shape}")
-            print(f"DV cos sample: {dv_cos[0, :5, 0]}")
-            
-            print(f"\ncos diff: {(hf_cos - dv_cos).abs().max().item()}")
-            print(f"sin diff: {(hf_sin - dv_sin).abs().max().item()}")
+            dv_cos, dv_sin = dv_rotary(dv_v, position_ids)
+            print(f"DV cos has nan: {torch.isnan(dv_cos).any()}, shape: {dv_cos.shape}, dtype: {dv_cos.dtype}")
+            print(f"DV sin has nan: {torch.isnan(dv_sin).any()}, shape: {dv_sin.shape}, dtype: {dv_sin.dtype}")
+            if not torch.isnan(dv_cos).any():
+                print(f"DV cos sample: {dv_cos[0, :3, :3]}")
         except Exception as e:
             print(f"DV rotary_emb failed with: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Call fresh rotary_emb
+        print("\nCalling fresh rotary_emb...")
+        try:
+            fresh_cos, fresh_sin = fresh_rotary(dv_v.float(), position_ids)  # Use float for comparison
+            print(f"Fresh cos has nan: {torch.isnan(fresh_cos).any()}, shape: {fresh_cos.shape}, dtype: {fresh_cos.dtype}")
+            print(f"Fresh sin has nan: {torch.isnan(fresh_sin).any()}, shape: {fresh_sin.shape}, dtype: {fresh_sin.dtype}")
+            if not torch.isnan(fresh_cos).any():
+                print(f"Fresh cos sample: {fresh_cos[0, :3, :3]}")
+        except Exception as e:
+            print(f"Fresh rotary_emb failed with: {e}")
             import traceback
             traceback.print_exc()
 
