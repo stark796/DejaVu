@@ -168,9 +168,22 @@ if __name__ == "__main__":
                             raise e
 
 
-                    
-                    # Loglikelihood is usually sum of logprobs
-                    logprob = sum_lobprob
+
+                    if n_positive == 0:
+                        print(f"WARNING: n_positive is 0 for request {i}")
+                        try:
+                            # Use get() and safe indexing to avoid crash during debug print
+                            prompt_val = batch.get('prompt', ['MISSING'])[i]
+                            target_val = batch.get('target', ['MISSING'])[i]
+                            print(f"Prop: {prompt_val}")
+                            print(f"Target: {target_val}")
+                        except Exception as e:
+                            print(f"Error printing debug info: {e}")
+                        
+                        logprob = -99999.0 # Penalty
+                    else:
+                        # Loglikelihood is usually sum of logprobs
+                        logprob = sum_lobprob
                     
                     # We negate it because mask_loss name implies loss (positive), but we want to return logprob
                     # The adapter flips it back.
