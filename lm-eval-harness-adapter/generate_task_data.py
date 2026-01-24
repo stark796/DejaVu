@@ -1,8 +1,14 @@
 import argparse
 import json
+import random
+import numpy as np
 
 from lm_eval import evaluator, tasks
 from tasks import EvalHarnessAdaptor
+
+# Set fixed random seed for consistent few-shot prompt generation
+random.seed(42)
+np.random.seed(42)
 
 
 if __name__ == "__main__":
