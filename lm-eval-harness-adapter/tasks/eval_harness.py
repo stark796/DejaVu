@@ -182,6 +182,7 @@ class EvalHarnessAdaptor(LM):
         # Disable multiprocessing for debugging prints
         return map(partial(process_request, seq=self.seq), requests)
 
+
     def loglikelihood(self, requests):
         output = []
 
@@ -201,5 +202,11 @@ class EvalHarnessAdaptor(LM):
             for loss, correct in zip(out["mask_loss"], out["each_correct"]):
                 output.append((float(-loss), bool(correct)))
 
+        # DEBUG: Print first 8 loglikelihood results
+        print(f"\nDEBUG loglikelihood results (first 8):")
+        for i, (logprob, is_correct) in enumerate(output[:8]):
+            print(f"  [{i}] logprob={logprob:.4f}, is_greedy={is_correct}")
+        print()
+        
         return output
 
