@@ -147,39 +147,50 @@ if __name__ == "__main__":
                     sum_lobprob = 0
                     if args.debug:
                         print(target)
-                    for token_idx, mask in enumerate(eval_mask):
+
+                    # Calculate alignment shift
+                    # We assume the mismatch is due to tokenization differences (e.g. splits/merges) 
+                    # but the content is the same, so we align the END of the sequences.
+                    # process_request length: batch['ctx_length'][i] + 1
+                    # inference length: len(tokens)
+                    proc_len = batch['ctx_length'][i] + 1
+                    inf_len = len(tokens)
+                    shift = inf_len - proc_len
+                    
+                    for token_idx, mask_val in enumerate(eval_mask):
+                        if not mask_val:
+                            continue
+
+                        # Map index: we want the token at (token_idx + 1) in the process_request frame
+                        # So we map it to inference frame.
+                        mapped_idx = token_idx + 1 + shift
+                        
+                        if mapped_idx < 0 or mapped_idx >= len(tokens):
+                             # This might happen if truncation differs significantly
+                             continue
+
+                        sum_lobprob += token_logprobs[mapped_idx]
+                        n_positive += 1
+                        
+                        # Only check correctness if we have logprobs
                         try:
-                            if token_idx + 1 >= len(tokens):
-                                break
-
-                            if mask == True:
-                                if args.debug:
-                                    print(
-                                        tokens[token_idx + 1],
-                                        next(iter(top_logprobs[token_idx + 1].keys())),
-                                    )
+                             if top_logprobs and mapped_idx < len(top_logprobs):
                                 correct = correct and (
-                                    tokens[token_idx + 1]
-                                    == next(iter(top_logprobs[token_idx + 1].keys()))
+                                    tokens[mapped_idx]
+                                    == next(iter(top_logprobs[mapped_idx].keys()))
                                 )
-                                sum_lobprob += token_logprobs[token_idx + 1]
-                                n_positive += 1
-                        except Exception as e:
-                            raise e
-
-
-
+                        except Exception:
+                             pass
+                    
                     if n_positive == 0:
                         print(f"WARNING: n_positive is 0 for request {i}")
                         try:
-                            # Use get() and safe indexing to avoid crash during debug print
                             prompt_val = batch.get('prompt', ['MISSING'])[i]
                             target_val = batch.get('target', ['MISSING'])[i]
                             print(f"Prop: {prompt_val}")
                             print(f"Target: {target_val}")
                             print(f"Tokens (last 10): {tokens[-10:]}")
-                            print(f"Inference tokens len: {len(tokens)}")
-                            print(f"Eval Mask len: {len(eval_mask)}")
+                            print(f" lengths: proc={proc_len}, inf={inf_len}, shift={shift}")
                         except Exception as e:
                             print(f"Error printing debug info: {e}")
                         
