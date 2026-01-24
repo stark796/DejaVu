@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import sys
+import gc
 import torch
 from tqdm import tqdm
 from transformers import AutoTokenizer
@@ -127,16 +128,10 @@ def run_inference(prompt, tokenizer, embeddings, layers, lm_head, config, device
 
 
 
-def run_generation(prompt, max_tokens, stop, tokenizer, embeddings, layers, lm_head, config, device, max_seq_len=2048):
+def run_generation(prompt, max_tokens, stop, tokenizer, embeddings, layers, lm_head, config, device):
     """Run greedy generation on a single prompt."""
     
     input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
-    
-    # Truncate if too long to avoid OOM
-    if input_ids.shape[1] > max_seq_len:
-        print(f"Truncating prompt from {input_ids.shape[1]} to {max_seq_len} tokens")
-        input_ids = input_ids[:, -max_seq_len:]  # Keep the end (most relevant for MCQ)
-    
     generated_ids = input_ids.clone()
     
     # Cache for efficient generation (if layers supported it, but here we might recompute or need to handle layer_past carefully)
@@ -198,8 +193,6 @@ def main():
                         help="HuggingFace model name for tokenizer (default: meta-llama/Llama-3.2-3B)")
     parser.add_argument("--model-type", type=str, default="llama", choices=["llama", "llama-sparse"])
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
-    parser.add_argument("--max-seq-len", type=int, default=2048, 
-                        help="Max sequence length to avoid OOM (default: 2048)")
     args = parser.parse_args()
     
     print(f"Loading model from {args.model_path} (type: {args.model_type})")
@@ -240,6 +233,7 @@ def main():
     # Run inference and write results
     # Append mode if resuming
     mode = "a" if start_idx > 0 else "w"
+    processed = 0
     with open(args.output_file, mode) as f:
         for item in tqdm(prompts):
             prompt = item["prompt"]
@@ -249,7 +243,7 @@ def main():
             if request_type == "generate_until":
                 # Generation request
                 stop = item.get("stop", None)
-                generated_text = run_generation(prompt, max_tokens, stop, tokenizer, embeddings, layers, lm_head, config, args.device, args.max_seq_len)
+                generated_text = run_generation(prompt, max_tokens, stop, tokenizer, embeddings, layers, lm_head, config, args.device)
                 result = {
                     "request": item,
                     "result": [generated_text] # lm-eval expects list of strings for generate_until
@@ -267,6 +261,12 @@ def main():
                 }
             
             f.write(json.dumps(result) + "\n")
+            processed += 1
+            
+            # Clear GPU cache every 100 prompts to prevent OOM
+            if processed % 100 == 0:
+                torch.cuda.empty_cache()
+                gc.collect()
     
     print(f"Results written to {args.output_file}")
 
