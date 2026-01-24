@@ -203,6 +203,42 @@ class LlamaAttention(nn.Module):
         self.predictor = None
         self.topk = None
 
+    def _apply(self, fn, recurse=True):
+        """
+        Override _apply to prevent rotary_emb.inv_freq from being converted to float16.
+        
+        This is critical because inv_freq values can underflow to zero in float16,
+        which corrupts the RoPE cos/sin computation and causes NaN in attention.
+        """
+        # Apply to all submodules except rotary_emb
+        for name, module in self._modules.items():
+            if name != 'rotary_emb' and module is not None:
+                module._apply(fn)
+        
+        # Apply fn to parameters and buffers of this module (not submodules)
+        for key, param in self._parameters.items():
+            if param is not None:
+                with torch.no_grad():
+                    new_param = fn(param)
+                if param.is_leaf:
+                    self._parameters[key] = torch.nn.Parameter(new_param, requires_grad=param.requires_grad)
+                else:
+                    self._parameters[key] = new_param
+        
+        for key, buf in self._buffers.items():
+            if buf is not None:
+                self._buffers[key] = fn(buf)
+        
+        # For rotary_emb, only move to device but keep dtype as float32
+        # by rebuilding it on the correct device
+        if hasattr(self, 'rotary_emb') and self.rotary_emb is not None:
+            # Get the target device from one of the linear layers
+            target_device = self.q_proj.weight.device
+            # Recreate rotary_emb fresh on the correct device (keeps float32)
+            self.rotary_emb = LlamaRotaryEmbedding(config=self.config).to(target_device)
+        
+        return self
+
     def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int):
         return (
             tensor.view(bsz, seq_len, self.num_heads, self.head_dim)
