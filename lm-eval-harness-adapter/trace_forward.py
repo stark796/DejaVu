@@ -87,37 +87,44 @@ def main():
         print(f"V projection - max diff: {diff}")
     
     print("\n" + "="*60)
-    print("STEP 3: FULL LAYER 0 FORWARD")
+    print("STEP 3: FULL LAYER 0 OUTPUT COMPARISON")
     print("="*60)
     
     with torch.no_grad():
-        # HF uses a different API - need to call with proper arguments
-        # Let me trace through what HF does internally
+        # For DejaVu, run through layer 0
+        dv_out, _ = dv_layer0(dv_hidden, layer_past=None)
         
-        # For DejaVu, use position_ids explicitly
-        seq_len = input_ids.size(1)
-        position_ids = torch.arange(0, seq_len, dtype=torch.long, device=device).unsqueeze(0)
+        # For HuggingFace, run full model but capture intermediate
+        # Actually, let's just run both through all layers and compare
         
-        # DejaVu layer forward
-        dv_out, _ = dv_layer0(dv_hidden, layer_past=None, position_ids=position_ids)
+        print(f"DV layer 0 output shape: {dv_out.shape}")
+        print(f"DV layer 0 output sample: {dv_out[0, 0, :5].tolist()}")
         
-        # For HF, we need to trace through without using full model
-        # Use its rotary embedding
-        cos, sin = hf_layer0.self_attn.rotary_emb(hf_v, position_ids)
+        # Run HF through layer 0 using internal method
+        # HF model.forward handles caching/position internally
+        # Let's compare outputs by running full forward on both
         
-        print(f"Position IDs: {position_ids}")
-        print(f"HF cos sample: {cos[0, 0, :5].tolist()}")
-        print(f"HF sin sample: {sin[0, 0, :5].tolist()}")
+        # Full HF forward
+        hf_output = hf_model(input_ids)
+        hf_logits = hf_output.logits[0, -1, :]
         
-        # Check if DejaVu uses same rotary embeddings
-        dv_cos, dv_sin = dv_layer0.self_attn.rotary_emb(dv_v, position_ids)
-        cos_diff = (cos - dv_cos).abs().max().item()
-        sin_diff = (sin - dv_sin).abs().max().item()
-        print(f"\nRotary cos diff: {cos_diff}")
-        print(f"Rotary sin diff: {sin_diff}")
+        # Full DV forward
+        dv_h = dv_hidden
+        for i in range(dv_config.num_hidden_layers):
+            dv_layer = LlamaBlock.from_pretrained(model_path, config=dv_config, layer_index=i).to(device).half()
+            dv_h, _ = dv_layer(dv_h, layer_past=None)
+        dv_lm_head = LlamaLMHead.from_pretrained(model_path, config=dv_config).to(device).half()
+        dv_logits = dv_lm_head(dv_h)[0, -1, :]
+        
+        diff = (hf_logits - dv_logits).abs().max().item()
+        print(f"\nFinal logits max diff: {diff}")
+        
+        print(f"\nHF predicts: {tokenizer.decode([hf_logits.argmax().item()])}")
+        print(f"DV predicts: {tokenizer.decode([dv_logits.argmax().item()])}")
     
     print("\n" + "="*60)
-    print("If rotary embeddings differ, that's the bug!")
+    print("KEY FINDING: Q/K/V projections match, so the bug is in")
+    print("attention computation, RoPE, or residual connections.")
     print("="*60)
 
 
