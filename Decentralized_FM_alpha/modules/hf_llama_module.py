@@ -361,20 +361,15 @@ class LlamaBlock(nn.Module):
             
             # Load with strict=False to see what's missing
             missing, unexpected = module.load_state_dict(state_dict, strict=False)
-            if missing and layer_index == 0:
-                print(f"WARNING: Missing keys: {missing}")
-            if unexpected and layer_index == 0:
-                print(f"WARNING: Unexpected keys: {unexpected}")
+            if missing:
+                print(f"WARNING: Layer {layer_index} MISSING keys: {missing}")
+            if unexpected:
+                print(f"WARNING: Layer {layer_index} UNEXPECTED keys: {unexpected}")
                 
         except Exception as e:
             print(f"Cannot load layer {layer_index} from <model_name>. The model is randomly initialized. Error: {e}")
 
         module.layer_index = layer_index
-        
-        # CRITICAL FIX: Reinitialize rotary embedding since skip_init doesn't initialize its buffers
-        # The LlamaRotaryEmbedding computes inv_freq in __init__, which is skipped by skip_init
-        module.self_attn.rotary_emb = LlamaRotaryEmbedding(config=config)
-        
         return module
 
     def forward(
