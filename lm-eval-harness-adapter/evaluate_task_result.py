@@ -147,22 +147,22 @@ if __name__ == "__main__":
                     sum_lobprob = 0
                     if args.debug:
                         print(target)
-                    for i, mask in enumerate(eval_mask):
+                    for token_idx, mask in enumerate(eval_mask):
                         try:
-                            if i + 1 >= len(tokens):
+                            if token_idx + 1 >= len(tokens):
                                 break
 
                             if mask == True:
                                 if args.debug:
                                     print(
-                                        tokens[i + 1],
-                                        next(iter(top_logprobs[i + 1].keys())),
+                                        tokens[token_idx + 1],
+                                        next(iter(top_logprobs[token_idx + 1].keys())),
                                     )
                                 correct = correct and (
-                                    tokens[i + 1]
-                                    == next(iter(top_logprobs[i + 1].keys()))
+                                    tokens[token_idx + 1]
+                                    == next(iter(top_logprobs[token_idx + 1].keys()))
                                 )
-                                sum_lobprob += token_logprobs[i + 1]
+                                sum_lobprob += token_logprobs[token_idx + 1]
                                 n_positive += 1
                         except Exception as e:
                             raise e
