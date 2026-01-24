@@ -177,6 +177,8 @@ if __name__ == "__main__":
                             target_val = batch.get('target', ['MISSING'])[i]
                             print(f"Prop: {prompt_val}")
                             print(f"Target: {target_val}")
+                            print(f"Tokens (last 10): {tokens[-10:]}")
+                            print(f"Eval Mask len: {len(eval_mask)}")
                         except Exception as e:
                             print(f"Error printing debug info: {e}")
                         
