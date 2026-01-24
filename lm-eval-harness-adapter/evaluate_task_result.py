@@ -178,6 +178,7 @@ if __name__ == "__main__":
                             print(f"Prop: {prompt_val}")
                             print(f"Target: {target_val}")
                             print(f"Tokens (last 10): {tokens[-10:]}")
+                            print(f"Inference tokens len: {len(tokens)}")
                             print(f"Eval Mask len: {len(eval_mask)}")
                         except Exception as e:
                             print(f"Error printing debug info: {e}")

@@ -57,6 +57,11 @@ def process_request(x, seq):
          ctx_tokens = [tokenizer.bos_token_id] + ctx_tokens
 
     all_tokens = ctx_tokens + cont_tokens
+    
+    # DEBUG: Print length of all_tokens
+    if len(all_tokens) < 2000: # Simple filter
+        print(f"DEBUG: process_request all_tokens len: {len(all_tokens)}, last tokens: {all_tokens[-5:]}")
+    
     all_tokens = np.array(all_tokens)[-seq:]  # truncate sequence at seq length
 
     provided_ctx = len(all_tokens) - 1
