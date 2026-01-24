@@ -175,7 +175,15 @@ if __name__ == "__main__":
                     each_correct.append(correct)
 
                 else:
-                    assert False
+                    if args.debug:
+                        print(f"FATAL: Missing key for request inside RealRunner.eval")
+                        print(f"Constructed Request: {json.dumps(request, indent=2)}")
+                        print(f"Constructed Key: {key}")
+                        print(f"Total keys in results: {len(self.results)}")
+                        print("First 3 keys in results:")
+                        for k in list(self.results.keys())[:3]:
+                            print(k)
+                    assert False, f"Key not found in results: {key}"
 
             out = {
                 "mask_loss": mask_loss,
