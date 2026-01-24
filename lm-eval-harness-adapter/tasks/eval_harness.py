@@ -46,8 +46,7 @@ def process_request(x, seq):
     cont_text = ftfy.fix_text(cont, normalization="NFKC")
     
     if not cont_text.strip():
-        print(f"DEBUG: Empty continuation! Ctx len: {len(ctx_text)}, Cont: '{cont_text}'")
-        print(f"DEBUG: Ctx end: '{ctx_text[-50:]}'")
+        pass  # Empty continuation handling removed for cleaner output
     all_text = ctx_text + cont_text
 
     ctx_tokens = tokenizer(ctx_text, add_special_tokens=False)["input_ids"]
@@ -58,10 +57,8 @@ def process_request(x, seq):
 
     all_tokens = ctx_tokens + cont_tokens
     
-    # DEBUG: Print length of all_tokens
-    if len(all_tokens) < 2000: # Simple filter
-        print(f"DEBUG: process_request all_tokens len: {len(all_tokens)}, last tokens: {all_tokens[-5:]}")
     
+
     all_tokens = np.array(all_tokens)[-seq:]  # truncate sequence at seq length
 
     provided_ctx = len(all_tokens) - 1
@@ -202,11 +199,7 @@ class EvalHarnessAdaptor(LM):
             for loss, correct in zip(out["mask_loss"], out["each_correct"]):
                 output.append((float(-loss), bool(correct)))
 
-        # DEBUG: Print first 8 loglikelihood results
-        print(f"\nDEBUG loglikelihood results (first 8):")
-        for i, (logprob, is_correct) in enumerate(output[:8]):
-            print(f"  [{i}] logprob={logprob:.4f}, is_greedy={is_correct}")
-        print()
         
+
         return output
 
