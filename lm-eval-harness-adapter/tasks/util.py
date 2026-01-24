@@ -46,6 +46,7 @@ def sample_batch(examples, bs, zero_example_shape):
             "eval_mask": [],
             "ctx_length": [],
             "text": [],
+            "prompt": [],
         }
 
         for sample in batch:
@@ -54,6 +55,7 @@ def sample_batch(examples, bs, zero_example_shape):
             batch_flattened["eval_mask"].append(sample["eval_mask"])
             batch_flattened["ctx_length"].append(sample["ctx_length"])
             batch_flattened["text"].append(sample["text"])
+            batch_flattened["prompt"].append(sample.get("prompt", ""))
 
         batch_flattened["obs"] = np.array(batch_flattened["obs"])
         batch_flattened["target"] = np.array(batch_flattened["target"])
