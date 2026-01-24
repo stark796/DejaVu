@@ -49,6 +49,7 @@ if __name__ == "__main__":
     class RealRunner:
         def __init__(self, args):
             self.results = {}
+            self.fuzzy_results = {}  # Key by last question for fuzzy matching
 
             with open(args.result_file, "r") as f:
                 for line in f:
@@ -61,9 +62,30 @@ if __name__ == "__main__":
                         continue
                     result = item["result"]
 
+                    # Exact key match
                     self.results[json_to_key(request)] = result
+                    
+                    # Fuzzy key: extract last question from prompt
+                    # For MCQ tasks, the last question is the actual test item
+                    prompt = request.get("prompt", "")
+                    # Split by "Question:" and take the last one
+                    parts = prompt.split("Question:")
+                    if len(parts) > 1:
+                        last_question = "Question:" + parts[-1].strip()
+                        self.fuzzy_results[last_question] = result
 
             print(f"{len(self.results)} items in the cache")
+            print(f"{len(self.fuzzy_results)} fuzzy keys (by last question)")
+
+        def _fuzzy_lookup(self, prompt):
+            """Try to find result by matching last question in prompt"""
+            parts = prompt.split("Question:")
+            if len(parts) > 1:
+                last_question = "Question:" + parts[-1].strip()
+                if last_question in self.fuzzy_results:
+                    return self.fuzzy_results[last_question]
+            return None
+
 
         def eval(self, batch):
             from tasks.eval_harness import tokenizer
@@ -135,9 +157,19 @@ if __name__ == "__main__":
                 key = json_to_key(request)
 
                 correct = True
-
+                
+                # Try exact match first, then fuzzy match
+                result = None
                 if key in self.results:
                     result = self.results[key]
+                else:
+                    # Try fuzzy lookup by last question
+                    result = self._fuzzy_lookup(text)
+                    if result and not hasattr(self, '_fuzzy_warned'):
+                        print("INFO: Using fuzzy matching for prompt lookup (few-shot examples differ)")
+                        self._fuzzy_warned = True
+
+                if result is not None:
 
                     token_logprobs = result["choices"][0]["logprobs"]["token_logprobs"]
                     tokens = result["choices"][0]["logprobs"]["tokens"]
