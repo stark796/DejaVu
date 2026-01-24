@@ -38,11 +38,17 @@ model_path=./pretrained_models/llama-3.2-3b
 export SPARSE_PATH=../checkpoint/llama-3b-sparse-predictor
 # Sparsity Config
 # MLP_TOPK: 4096 / 8192 = 50% active (50% Sparse)
-export MLP_TOPK=8192
+export MLP_TOPK=4096
 export ATT_TOPK=1.0            # 100% active heads (Dense Attention)            # Fraction of active attention heads
 
 # Create directories if needed
 mkdir -p ./c4_val
+
+# Clean up previous output to ensure fresh results
+if [ -f "$output_file" ]; then
+    echo "removing old output file: $output_file"
+    rm -f "$output_file"
+fi
 
 # Check if predictors exist
 if [ ! -d "$SPARSE_PATH" ]; then
