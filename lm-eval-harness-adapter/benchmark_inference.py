@@ -234,34 +234,43 @@ def main():
     # Append mode if resuming
     mode = "a" if start_idx > 0 else "w"
     processed = 0
+    skipped = 0
     with open(args.output_file, mode) as f:
         for item in tqdm(prompts):
             prompt = item["prompt"]
             max_tokens = item.get("max_tokens", 0)
             request_type = item.get("request_type", "language-model-inference")
             
-            if request_type == "generate_until":
-                # Generation request
-                stop = item.get("stop", None)
-                generated_text = run_generation(prompt, max_tokens, stop, tokenizer, embeddings, layers, lm_head, config, args.device)
-                result = {
-                    "request": item,
-                    "result": [generated_text] # lm-eval expects list of strings for generate_until
-                }
-            else:
-                # Loglikelihood request
-                logprobs = run_inference(prompt, tokenizer, embeddings, layers, lm_head, config, args.device)
-                result = {
-                    "request": item,
-                    "result": {
-                        "choices": [{
-                            "logprobs": logprobs
-                        }]
+            try:
+                if request_type == "generate_until":
+                    # Generation request
+                    stop = item.get("stop", None)
+                    generated_text = run_generation(prompt, max_tokens, stop, tokenizer, embeddings, layers, lm_head, config, args.device)
+                    result = {
+                        "request": item,
+                        "result": [generated_text] # lm-eval expects list of strings for generate_until
                     }
-                }
-            
-            f.write(json.dumps(result) + "\n")
-            processed += 1
+                else:
+                    # Loglikelihood request
+                    logprobs = run_inference(prompt, tokenizer, embeddings, layers, lm_head, config, args.device)
+                    result = {
+                        "request": item,
+                        "result": {
+                            "choices": [{
+                                "logprobs": logprobs
+                            }]
+                        }
+                    }
+                
+                f.write(json.dumps(result) + "\n")
+                processed += 1
+                
+            except torch.cuda.OutOfMemoryError:
+                skipped += 1
+                print(f"\\nSkipping prompt {processed + skipped} due to OOM (len={len(prompt)} chars)")
+                torch.cuda.empty_cache()
+                gc.collect()
+                continue
             
             # Clear GPU cache after every prompt to prevent OOM on long sequences
             torch.cuda.empty_cache()
