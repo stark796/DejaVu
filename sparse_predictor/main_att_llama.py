@@ -13,21 +13,33 @@ DATA = {
     "llama-3b": {
         "c4": "../Decentralized_FM_alpha/data/llama_3b_c4",
     },
+    "llama-8b": {
+        "c4": "../Decentralized_FM_alpha/data/llama_8b_c4",
+    },
 }
 
-MODEL_CHOICES = ['llama-3b']
+MODEL_CHOICES = ['llama-3b', 'llama-8b']
 DATA_CHOICES = ['c4']
 
-# Configuration for Llama 3.2 3B
+# Configuration for Llama models
 CONFIG = {
     'llama-3b': {
-        'num_layer': 28,           # 28 layers
+        'num_layer': 28,
         'ckt_storage': "bylayer",
-        'd': 3072,                 # hidden_size
-        'intermediate': 8192,       # intermediate_size (for MLP)
-        'h': 24,                   # num_attention_heads
-        'kv_h': 8,                 # num_key_value_heads (GQA)
-        'N': 80000,               # number of samples
+        'd': 3072,
+        'intermediate': 8192,
+        'h': 24,
+        'kv_h': 8,
+        'N': 80000,
+    },
+    'llama-8b': {
+        'num_layer': 32,
+        'ckt_storage': "bylayer",
+        'd': 4096,
+        'intermediate': 14336,
+        'h': 32,
+        'kv_h': 8,
+        'N': 80000,
     },
 }
 
