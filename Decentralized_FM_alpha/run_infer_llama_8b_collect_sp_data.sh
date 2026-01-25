@@ -50,13 +50,14 @@ export DATA_PATH=${data_path}
 # - num-layers: 32
 # - hidden-size: 4096
 # - NOTE: Using fp32 (not fp16) because Llama 3.1 RoPE scaling causes NaN in fp16
+# - NOTE: Reduced budget (seq length) to fit in 48GB GPU
 
 ARGS="--model-name ${model_path} \
 --model-type llama-save \
 --seed 42 \
 --num-layers 32 \
 --max-layers 32 \
---budget 40960 \
+--budget 20480 \
 --num-iters 2000 \
 --dist-url tcp://127.0.0.1:9035 \
 --token-micro-batch-size 1 \
