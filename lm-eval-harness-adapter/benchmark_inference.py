@@ -263,10 +263,9 @@ def main():
             f.write(json.dumps(result) + "\n")
             processed += 1
             
-            # Clear GPU cache every 10 prompts to prevent OOM
-            if processed % 10 == 0:
-                torch.cuda.empty_cache()
-                gc.collect()
+            # Clear GPU cache after every prompt to prevent OOM on long sequences
+            torch.cuda.empty_cache()
+            gc.collect()
     
     print(f"Results written to {args.output_file}")
 
