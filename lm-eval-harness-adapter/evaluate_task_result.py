@@ -264,7 +264,13 @@ if __name__ == "__main__":
                         print("First 3 keys in results:")
                         for k in list(self.results.keys())[:3]:
                             print(k)
-                    assert False, f"Key not found in results: {key}"
+                    # Skip missing keys (e.g., prompts that were skipped during inference due to OOM)
+                    if not hasattr(self, '_missing_warned'):
+                        print(f"WARNING: Skipping {1} prompt(s) with missing results (possibly OOM during inference)")
+                        self._missing_warned = True
+                    self._missing_count = getattr(self, '_missing_count', 0) + 1
+                    mask_loss.append(float('inf'))  # High loss for missing
+                    each_correct.append(False)  # Mark as incorrect
 
             out = {
                 "mask_loss": mask_loss,
