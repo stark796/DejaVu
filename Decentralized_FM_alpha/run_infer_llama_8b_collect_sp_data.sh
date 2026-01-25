@@ -49,12 +49,11 @@ export DATA_PATH=${data_path}
 # For Llama 3.1 8B:
 # - num-layers: 32
 # - hidden-size: 4096
-# - Uses llama-save model type for data collection
+# - NOTE: Using fp32 (not fp16) because Llama 3.1 RoPE scaling causes NaN in fp16
 
 ARGS="--model-name ${model_path} \
 --model-type llama-save \
 --seed 42 \
---fp16 \
 --num-layers 32 \
 --max-layers 32 \
 --budget 40960 \
