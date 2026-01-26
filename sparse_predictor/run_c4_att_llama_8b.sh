@@ -39,8 +39,7 @@ for L in $(seq 0 $((NUM_LAYERS - 1))); do
         --batch_size 1024 \
         --epochs 20 \
         --lr 0.0001 \
-        --topk 32 \
-        --threshold 0.0
+        --k 1.0
     
     if [ $? -ne 0 ]; then
         echo "ERROR: Training failed for layer $L"
