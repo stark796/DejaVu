@@ -36,7 +36,7 @@ echo "======================================"
 
 # Sparsity config
 export SPARSE_PATH=${sparse_path}
-export MLP_TOPK=4301
+export MLP_TOPK=14336
 export ATT_TOPK=1.0
 
 # Run inference with WikiText test set
