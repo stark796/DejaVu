@@ -43,7 +43,8 @@ def main():
     print("Downloading WikiText-2 dataset...")
     
     # Load WikiText-2 (raw version for proper detokenization)
-    dataset = load_dataset("wikitext", "wikitext-2-raw-v1")
+    # Dataset moved to Salesforce namespace on HuggingFace
+    dataset = load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1", trust_remote_code=True)
     
     # Create output directories
     os.makedirs("./data/wikitext", exist_ok=True)
