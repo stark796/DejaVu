@@ -6,7 +6,7 @@
 # Common Settings
 export ATT_TOPK=1.0  # 0% Attention Sparsity
 INPUT_FILE="./wikitext_eval/wikitext_test.jsonl"
-SWEEP_DIR="./wikitext_eval/mlp_sweep"
+SWEEP_DIR="./wikitext_eval"
 mkdir -p "$SWEEP_DIR"
 
 # Check data
@@ -38,7 +38,7 @@ run_sweep() {
         SPARSITY=$(python -c "print(int((1.0 - $RATIO) * 100))")
         
         OUTPUT_FILE="$SWEEP_DIR/${MODEL_NAME}_sparsity_${SPARSITY}.jsonl"
-        EVAL_FILE="$SWEEP_DIR/${MODEL_NAME}_sparsity_${SPARSITY}.txt"
+        EVAL_FILE="$SWEEP_DIR/eval_${MODEL_NAME}_sparse.txt"
 
         echo "-----------------------------------------------------------------"
         echo "Running ${SPARSITY}% Sparsity (Keep $RATIO)"
