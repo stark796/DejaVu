@@ -234,3 +234,17 @@ text = item.get("prompt") or item.get("text", "")
 - **CUDA:** 12.4
 - **GPU:** RTX 6000 Ada (48GB)
 - **Key packages:** transformers, cupy-cuda12x, boto3, loguru, netifaces
+
+---
+
+## Evaluation & Analysis Phase
+
+### 1. Comprehensive Benchmarking
+- **Benchmarks Covered:**
+  - **0-shot:** BoolQ, Winogrande, RTE, ARC-e, ARC-c, HellaSwag, OpenBookQA
+  - **Multi-shot:** MMLU, GPQA, MedMCQA
+- **Key Finding:** Documented accuracy trade-offs at varying sparsity levels.
+
+### 2. Sparse Inference with Llama
+- Successfully ran sparse inference on **Wikitext** and **C4**.
+- Validated perplexity calculations for both 3B and 8B models.
